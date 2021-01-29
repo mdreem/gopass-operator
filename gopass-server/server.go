@@ -11,11 +11,31 @@ import (
 )
 
 type gopassRepo struct {
-	store *api.Gopass
+	store     *api.Gopass
+	directory string
 }
 
 type config struct {
 	Path string `yaml:"path"`
+}
+
+func InitializeNewGopassRepository(repositoryUrl string) (*gopassRepo, error) {
+	repoDir, err := ioutil.TempDir("", "gopass")
+	if err != nil {
+		return nil, err
+	}
+
+	err = cloneGopassRepo(repositoryUrl, repoDir)
+	if err != nil {
+		return nil, err
+	}
+
+	gr, err := createNewGopassClient(context.Background(), repoDir)
+	if err != nil {
+		return nil, err
+	}
+
+	return gr, nil
 }
 
 func cloneGopassRepo(repositoryUrl string, path string) error {
@@ -32,7 +52,7 @@ func createNewGopassClient(ctx context.Context, path string) (*gopassRepo, error
 	if err != nil {
 		return nil, err
 	}
-	defer funcName(file)
+	defer removeFile(file)
 	fmt.Printf("created temporary configuration file: %s\n", file.Name())
 
 	c := config{
@@ -65,13 +85,16 @@ func createNewGopassClient(ctx context.Context, path string) (*gopassRepo, error
 	}
 
 	gr := &gopassRepo{
-		store: store,
+		store:     store,
+		directory: path,
 	}
 
 	return gr, nil
 }
 
-func funcName(file *os.File) {
+func removeFile(file *os.File) {
 	err := os.Remove(file.Name())
-	fmt.Printf("failed to remove file: %v", err)
+	if err != nil {
+		fmt.Printf("failed to remove file: %v\n", err)
+	}
 }

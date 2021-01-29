@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -60,6 +61,27 @@ func TestCloneRepository(t *testing.T) {
 	if err != nil {
 		t.Errorf("not able to clone repository: %v", err)
 		return
+	}
+}
+
+func TestInitializeNewGopassRepository(t *testing.T) {
+	repoDir := t.TempDir()
+
+	unzip(filepath.Join("resources_test", "password-store.zip"), repoDir, t)
+
+	repository, err := InitializeNewGopassRepository(filepath.Join(repoDir, ".password-store"))
+	if err != nil {
+		t.Errorf("not able to initialize gopass repository: %v\n", err)
+		return
+	}
+
+	t.Logf("removing: %s", repository.directory)
+	if strings.HasPrefix(repository.directory, os.TempDir()) {
+		err = os.RemoveAll(repository.directory)
+		if err != nil {
+			t.Errorf("not able to remove directory (%s): %v\n", repository.directory, err)
+			return
+		}
 	}
 }
 
