@@ -3,6 +3,7 @@ package gopass_server
 import (
 	"context"
 	"fmt"
+	"github.com/go-git/go-git/v5"
 	"github.com/gopasspw/gopass/pkg/gopass/api"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
@@ -15,6 +16,15 @@ type gopassRepo struct {
 
 type config struct {
 	Path string `yaml:"path"`
+}
+
+func cloneGopassRepo(repositoryUrl string, path string) error {
+	_, err := git.PlainClone(path, false, &git.CloneOptions{
+		URL:      repositoryUrl,
+		Depth:    1,
+		Progress: os.Stdout,
+	})
+	return err
 }
 
 func createNewGopassClient(ctx context.Context, path string) (*gopassRepo, error) {
