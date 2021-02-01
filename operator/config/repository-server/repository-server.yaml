@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gopass-repository-deployment
+  labels:
+    app: gopass-repository
+spec:
+  selector:
+    matchLabels:
+      app: gopass-repository
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: gopass-repository
+    spec:
+      containers:
+        - name: gopass-repository
+          image: public.ecr.aws/d7n7y2i7/gopass-operator:0.0.1
+          ports:
+            - containerPort: 9000
