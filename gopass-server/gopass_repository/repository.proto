@@ -1,0 +1,18 @@
+syntax = "proto3";
+option go_package = "pkg/apiclient/gopass_repository";
+
+package gopass_repository;
+
+message Repository {
+  string repositoryURL = 1;
+}
+
+message RepositoryResponse {
+  bool successful = 1;
+  string errorMessage = 2;
+}
+
+service RepositoryService {
+  rpc InitializeRepository(Repository) returns (RepositoryResponse) {}
+  rpc UpdateRepository(Repository) returns (RepositoryResponse) {}
+}
