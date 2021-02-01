@@ -31,8 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	gopassv1alpha1 "github.com/mdreem/gopass-operator/operator/api/v1alpha1"
-	"github.com/mdreem/gopass-operator/operator/controllers"
+	gopassv1alpha1 "github.com/mdreem/gopass-operator/api/v1alpha1"
+	"github.com/mdreem/gopass-operator/controllers"
 	// +kubebuilder:scaffold:imports
 )
 

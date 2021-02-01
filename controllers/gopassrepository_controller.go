@@ -24,7 +24,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	gopassv1alpha1 "github.com/mdreem/gopass-operator/operator/api/v1alpha1"
+	gopassv1alpha1 "github.com/mdreem/gopass-operator/api/v1alpha1"
 )
 
 // GopassRepositoryReconciler reconciles a GopassRepository object
