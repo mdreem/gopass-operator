@@ -1,0 +1,7 @@
+apiVersion: gopass.gopass.operator/v1alpha1
+kind: GopassRepository
+metadata:
+  name: gopassrepository-sample
+spec:
+  # Add fields here
+  foo: bar

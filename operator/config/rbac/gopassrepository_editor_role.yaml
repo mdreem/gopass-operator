@@ -1,0 +1,24 @@
+# permissions for end users to edit gopassrepositories.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: gopassrepository-editor-role
+rules:
+- apiGroups:
+  - gopass.gopass.operator
+  resources:
+  - gopassrepositories
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - gopass.gopass.operator
+  resources:
+  - gopassrepositories/status
+  verbs:
+  - get
