@@ -10,4 +10,10 @@ $(PROTOC_GEN_GO):
 %.pb.go: %.proto | $(PROTOC_GEN_GO)
 	protoc --go_out=plugins=grpc:. $<
 
-compile: gopass-server/gopass_repository/repository.pb.go
+build_protobuf: gopass-server/gopass_repository/repository.pb.go
+
+build: build_protobuf
+	go build -o bin/gopass_server cmd/main.go
+
+build_docker: build
+	docker build . -f gopass-server/docker/Dockerfile -t gopass-server
