@@ -24,5 +24,9 @@ func main() {
 			RepositoryURL: "TestUrl",
 		},
 	)
-	fmt.Printf("repository: %v", *repository)
+	if repository == nil {
+		fmt.Printf("got an empty response")
+		return
+	}
+	fmt.Printf("repository: %t", (*repository).Successful)
 }

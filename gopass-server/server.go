@@ -1,28 +1,13 @@
 package gopass_server
 
 import (
-	"context"
 	"fmt"
-	"github.com/go-git/go-git/v5"
-	"github.com/gopasspw/gopass/pkg/gopass/api"
 	"github.com/mdreem/gopass-operator/gopass-server/gopass_repository"
 	gopass_repository_grpc "github.com/mdreem/gopass-operator/pkg/apiclient/gopass_repository"
 	"google.golang.org/grpc"
-	"gopkg.in/yaml.v2"
-	"io/ioutil"
 	"log"
 	"net"
-	"os"
 )
-
-type gopassRepo struct {
-	store     *api.Gopass
-	directory string
-}
-
-type config struct {
-	Path string `yaml:"path"`
-}
 
 func Run() {
 	grpcServer := grpc.NewServer()
@@ -38,94 +23,5 @@ func Run() {
 	err = grpcServer.Serve(lis)
 	if err != nil {
 		log.Fatalf("failed to start grpc server: %v", err)
-	}
-}
-
-func initializeNewGopassRepository(repositoryUrl string) (*gopassRepo, error) {
-	repoDir, err := ioutil.TempDir("", "gopass")
-	if err != nil {
-		log.Printf("not able to create local repository directory: %v", err)
-		return nil, err
-	}
-
-	err = cloneGopassRepo(repositoryUrl, repoDir)
-	if err != nil {
-		log.Printf("not able clone gopass repository with URL %s: %v", repositoryUrl, err)
-		return nil, err
-	}
-
-	gr, err := createNewGopassClient(context.Background(), repoDir)
-	if err != nil {
-		log.Printf("not able to create new gopass client: %v", err)
-		return nil, err
-	}
-
-	return gr, nil
-}
-
-func cloneGopassRepo(repositoryUrl string, path string) error {
-	_, err := git.PlainClone(path, false, &git.CloneOptions{
-		URL:      repositoryUrl,
-		Depth:    1,
-		Progress: os.Stdout,
-	})
-	return err
-}
-
-func createNewGopassClient(ctx context.Context, path string) (*gopassRepo, error) {
-	file, err := ioutil.TempFile("", "*config.yml")
-	if err != nil {
-		log.Printf("not able to create temporary configuration file %v\n", err)
-		return nil, err
-	}
-	defer removeFile(file)
-	log.Printf("created temporary configuration file: %s\n", file.Name())
-
-	c := config{
-		Path: path,
-	}
-
-	marshalledConfig, err := yaml.Marshal(&c)
-	if err != nil {
-		log.Printf("not able to marshall configuration file: %v\n", err)
-		return nil, err
-	}
-
-	_, err = file.Write(marshalledConfig)
-	if err != nil {
-		log.Printf("not able to write configuration file: %v\n", err)
-		return nil, err
-	}
-
-	err = file.Close()
-	if err != nil {
-		log.Printf("not able to close configuration file: %v\n", err)
-		return nil, err
-	}
-
-	err = os.Setenv("GOPASS_CONFIG", file.Name())
-	if err != nil {
-		log.Printf("not able to set environment variable: %v\n", err)
-		return nil, err
-	}
-
-	store, err := api.New(ctx)
-	if err != nil {
-		log.Printf("not able to create a new gopass client: %v\n", err)
-		return nil, err
-	}
-
-	gr := &gopassRepo{
-		store:     store,
-		directory: path,
-	}
-
-	return gr, nil
-}
-
-func removeFile(file *os.File) {
-	err := os.Remove(file.Name())
-	if err != nil {
-		log.Printf("failed to remove file: %v\n", err)
 	}
 }

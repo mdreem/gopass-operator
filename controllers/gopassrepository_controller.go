@@ -18,13 +18,14 @@ package controllers
 
 import (
 	"context"
+	"google.golang.org/grpc"
 
 	"github.com/go-logr/logr"
+	gopassv1alpha1 "github.com/mdreem/gopass-operator/api/v1alpha1"
+	"github.com/mdreem/gopass-operator/pkg/apiclient/gopass_repository"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	gopassv1alpha1 "github.com/mdreem/gopass-operator/api/v1alpha1"
 )
 
 // GopassRepositoryReconciler reconciles a GopassRepository object
@@ -48,9 +49,37 @@ type GopassRepositoryReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.7.0/pkg/reconcile
 func (r *GopassRepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = r.Log.WithValues("gopassrepository", req.NamespacedName)
+	log := r.Log.WithValues("gopassrepository", req.NamespacedName)
 
-	// your logic here
+	log.Info("reconciliation")
+
+	var conn *grpc.ClientConn
+	conn, err := grpc.Dial("operator-gopass-repository:9000", grpc.WithInsecure())
+	if err != nil {
+		log.Error(err, "not able to connect to repository server")
+	}
+	defer conn.Close()
+
+	log.Info("attempting to call repository server")
+
+	c := gopass_repository.NewRepositoryServiceClient(conn)
+
+	repository, err := c.InitializeRepository(
+		context.Background(),
+		&gopass_repository.Repository{
+			RepositoryURL: "TestUrl",
+		},
+	)
+
+	if err != nil {
+		log.Error(err, "invalid response")
+	}
+
+	if repository != nil {
+		log.Info("repository call:", "successful", (*repository).Successful)
+	} else {
+		log.Info("empty response from repository server")
+	}
 
 	return ctrl.Result{}, nil
 }

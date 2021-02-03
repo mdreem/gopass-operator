@@ -1,4 +1,4 @@
-package gopass_server
+package gopass_repository
 
 import (
 	"archive/zip"

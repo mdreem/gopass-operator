@@ -4,6 +4,9 @@ PROTOC_GEN_GO := $(GOPATH)/bin/protoc-gen-go
 SHELL := /bin/bash
 PATH := $(GOPATH)/bin/:$(PATH)
 
+VERSION ?= 0.0.2
+IMG ?= public.ecr.aws/d7n7y2i7/gopass-controller:$(VERSION)
+
 $(PROTOC_GEN_GO):
 	go get -u github.com/golang/protobuf/protoc-gen-go
 
@@ -16,4 +19,10 @@ build: build_protobuf
 	go build -o bin/gopass_server cmd/main.go
 
 build_docker: build
-	docker build . -f gopass-server/docker/Dockerfile -t gopass-server
+	docker build . -f docker/Dockerfile -t $(IMG)
+
+docker-push:
+	docker push ${IMG}
+
+docker-login:
+	aws ecr-public get-login-password --region eu-central-1 | docker login --username AWS --password-stdin public.ecr.aws
