@@ -1,5 +1,5 @@
 # Current Operator version
-VERSION ?= 0.0.2
+VERSION ?= 0.0.3
 # Default bundle image tag
 BUNDLE_IMG ?= controller-bundle:$(VERSION)
 # Options for 'bundle-build'
@@ -82,7 +82,7 @@ docker-push:
 	docker push ${IMG}
 
 docker-login:
-	aws ecr-public get-login-password --region eu-central-1 | docker login --username AWS --password-stdin public.ecr.aws
+	aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
 
 # Download controller-gen locally if necessary
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen

@@ -5,7 +5,7 @@ SHELL := /bin/bash
 PATH := $(GOPATH)/bin/:$(PATH)
 
 VERSION ?= 0.0.2
-IMG ?= public.ecr.aws/d7n7y2i7/gopass-controller:$(VERSION)
+IMG ?= public.ecr.aws/d7n7y2i7/gopass-operator:$(VERSION)
 
 $(PROTOC_GEN_GO):
 	go get -u github.com/golang/protobuf/protoc-gen-go
@@ -13,16 +13,16 @@ $(PROTOC_GEN_GO):
 %.pb.go: %.proto | $(PROTOC_GEN_GO)
 	protoc --go_out=plugins=grpc:. $<
 
-build_protobuf: gopass-server/gopass_repository/repository.pb.go
+build_protobuf: gopass_repository/repository.pb.go
 
 build: build_protobuf
 	go build -o bin/gopass_server cmd/main.go
 
-build_docker: build
+docker-build: build
 	docker build . -f docker/Dockerfile -t $(IMG)
 
 docker-push:
 	docker push ${IMG}
 
 docker-login:
-	aws ecr-public get-login-password --region eu-central-1 | docker login --username AWS --password-stdin public.ecr.aws
+	aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws

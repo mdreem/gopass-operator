@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: gopass-repository
-          image: public.ecr.aws/d7n7y2i7/gopass-operator:0.0.1
+          image: public.ecr.aws/d7n7y2i7/gopass-operator:0.0.2
           ports:
             - containerPort: 9000
 ---

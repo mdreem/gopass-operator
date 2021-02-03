@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"google.golang.org/grpc"
+	"time"
 
 	"github.com/go-logr/logr"
 	gopassv1alpha1 "github.com/mdreem/gopass-operator/api/v1alpha1"
@@ -53,12 +54,47 @@ func (r *GopassRepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	log.Info("reconciliation")
 
+	gopassRepository := &gopassv1alpha1.GopassRepository{}
+	err := r.Get(ctx, req.NamespacedName, gopassRepository)
+	if err != nil {
+		log.Error(err, "unable to fetch data from request")
+		return ctrl.Result{}, err
+	}
+
+	err = r.initializeRepository(log, gopassRepository.Spec.RepositoryURL)
+	if err != nil {
+		log.Error(err, "unable to initialize repository")
+		return ctrl.Result{}, err
+	}
+
+	interval, err := parseRefreshInterval(gopassRepository.Spec.RefreshInterval)
+	if err != nil {
+		log.Error(err, "unable to parse refresh interval")
+		return ctrl.Result{}, err
+	}
+
+	return ctrl.Result{RequeueAfter: interval}, nil
+}
+
+func parseRefreshInterval(refreshInterval string) (time.Duration, error) {
+	if refreshInterval == "" {
+		return 0, nil
+	}
+
+	refreshIntervalValue, err := time.ParseDuration(refreshInterval)
+	if err != nil {
+		return 0, err
+	}
+	return refreshIntervalValue, nil
+}
+
+func (r *GopassRepositoryReconciler) initializeRepository(log logr.Logger, url string) error {
 	var conn *grpc.ClientConn
 	conn, err := grpc.Dial("operator-gopass-repository:9000", grpc.WithInsecure())
 	if err != nil {
 		log.Error(err, "not able to connect to repository server")
+		return err
 	}
-	defer conn.Close()
 
 	log.Info("attempting to call repository server")
 
@@ -67,12 +103,19 @@ func (r *GopassRepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	repository, err := c.InitializeRepository(
 		context.Background(),
 		&gopass_repository.Repository{
-			RepositoryURL: "TestUrl",
+			RepositoryURL: url,
 		},
 	)
 
+	connectionError := conn.Close()
+	if connectionError != nil {
+		log.Error(connectionError, "not able to close connection")
+		return connectionError
+	}
+
 	if err != nil {
 		log.Error(err, "invalid response")
+		return err
 	}
 
 	if repository != nil {
@@ -80,8 +123,7 @@ func (r *GopassRepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	} else {
 		log.Info("empty response from repository server")
 	}
-
-	return ctrl.Result{}, nil
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

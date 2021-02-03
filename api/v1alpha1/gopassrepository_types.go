@@ -29,7 +29,8 @@ type GopassRepositorySpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Foo is an example field of GopassRepository. Edit GopassRepository_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	RepositoryURL   string `json:"repositoryUrl,omitempty"`
+	RefreshInterval string `json:"refreshInterval,omitempty"`
 }
 
 // GopassRepositoryStatus defines the observed state of GopassRepository

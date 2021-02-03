@@ -22,11 +22,28 @@ type config struct {
 }
 
 type RepositoryServer struct {
-	repositories map[string]gopassRepo
+	Repositories map[string]*gopassRepo
 }
 
-func (*RepositoryServer) InitializeRepository(_ context.Context, repository *gopass_repository.Repository) (*gopass_repository.RepositoryResponse, error) {
+func (r *RepositoryServer) InitializeRepository(_ context.Context, repository *gopass_repository.Repository) (*gopass_repository.RepositoryResponse, error) {
 	log.Printf("InitializeRepository called with: %s", (*repository).RepositoryURL)
+
+	_, ok := (r.Repositories)[(*repository).RepositoryURL]
+	if ok {
+		log.Printf("repository with URL '%s' already initialized", (*repository).RepositoryURL)
+		return &gopass_repository.RepositoryResponse{
+			Successful:   true,
+			ErrorMessage: "",
+		}, nil
+	}
+
+	gopassRepository, err := initializeNewGopassRepository((*repository).RepositoryURL)
+	if err != nil {
+		log.Printf("error initializing repository: %v", err)
+		return nil, err
+	}
+
+	(r.Repositories)[(*repository).RepositoryURL] = gopassRepository
 
 	return &gopass_repository.RepositoryResponse{
 		Successful:   true,
@@ -43,7 +60,9 @@ func (*RepositoryServer) UpdateRepository(_ context.Context, repository *gopass_
 }
 
 func Initialize() *RepositoryServer {
-	return &RepositoryServer{}
+	return &RepositoryServer{
+		Repositories: make(map[string]*gopassRepo),
+	}
 }
 
 func initializeNewGopassRepository(repositoryUrl string) (*gopassRepo, error) {
