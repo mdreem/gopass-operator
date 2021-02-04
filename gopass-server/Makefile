@@ -4,14 +4,14 @@ PROTOC_GEN_GO := $(GOPATH)/bin/protoc-gen-go
 SHELL := /bin/bash
 PATH := $(GOPATH)/bin/:$(PATH)
 
-VERSION ?= 0.0.2
+VERSION ?= 0.0.4
 IMG ?= public.ecr.aws/d7n7y2i7/gopass-operator:$(VERSION)
 
 $(PROTOC_GEN_GO):
 	go get -u github.com/golang/protobuf/protoc-gen-go
 
 %.pb.go: %.proto | $(PROTOC_GEN_GO)
-	protoc --go_out=plugins=grpc:. $<
+	protoc --go_out=plugins=grpc:.. $<
 
 build_protobuf: gopass_repository/repository.pb.go
 

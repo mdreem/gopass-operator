@@ -12,7 +12,17 @@ message RepositoryResponse {
   string errorMessage = 2;
 }
 
+message Secret {
+  string name = 1;
+  string password = 2;
+}
+
+message SecretList {
+  repeated Secret secrets = 1;
+}
+
 service RepositoryService {
   rpc InitializeRepository(Repository) returns (RepositoryResponse) {}
   rpc UpdateRepository(Repository) returns (RepositoryResponse) {}
+  rpc FetchAllPasswords(Repository) returns (SecretList) {}
 }

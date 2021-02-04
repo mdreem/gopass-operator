@@ -2,6 +2,7 @@ package gopass_repository
 
 import (
 	"context"
+	"fmt"
 	"github.com/go-git/go-git/v5"
 	"github.com/gopasspw/gopass/pkg/gopass/api"
 	"github.com/mdreem/gopass-operator/pkg/apiclient/gopass_repository"
@@ -23,6 +24,11 @@ type config struct {
 
 type RepositoryServer struct {
 	Repositories map[string]*gopassRepo
+}
+
+type secret struct {
+	Name     string
+	Password string
 }
 
 func (r *RepositoryServer) InitializeRepository(_ context.Context, repository *gopass_repository.Repository) (*gopass_repository.RepositoryResponse, error) {
@@ -57,6 +63,31 @@ func (*RepositoryServer) UpdateRepository(_ context.Context, repository *gopass_
 		Successful:   true,
 		ErrorMessage: "",
 	}, nil
+}
+
+func (r *RepositoryServer) FetchAllPasswords(ctx context.Context, repository *gopass_repository.Repository) (*gopass_repository.SecretList, error) {
+	repo, ok := (r.Repositories)[(*repository).RepositoryURL]
+	if !ok {
+		return nil, fmt.Errorf("repository with URL '%s' not found", (*repository).RepositoryURL)
+	}
+	passwords, err := fetchAllPasswords(ctx, repo)
+	if err != nil {
+		log.Printf("error fetching passwords: %v", err)
+		return nil, err
+	}
+
+	secretList := gopass_repository.SecretList{
+		Secrets: make([]*gopass_repository.Secret, 0),
+	}
+
+	for _, password := range passwords {
+		secretList.Secrets = append(secretList.Secrets, &gopass_repository.Secret{
+			Name:     password.Name,
+			Password: password.Password,
+		})
+	}
+
+	return &secretList, nil
 }
 
 func Initialize() *RepositoryServer {
@@ -152,4 +183,28 @@ func removeFile(file *os.File) {
 	if err != nil {
 		log.Printf("failed to remove file: %v\n", err)
 	}
+}
+
+func fetchAllPasswords(ctx context.Context, repo *gopassRepo) ([]secret, error) {
+	list, err := (*repo).store.List(ctx)
+	if err != nil {
+		log.Printf("not able to list contents of repository: %v\n", err)
+		return nil, err
+	}
+
+	passwords := make([]secret, 0)
+
+	for _, passwordName := range list {
+		password, err := (*repo).store.Get(ctx, passwordName, "")
+		if err != nil {
+			log.Printf("not able to fetch password '%s': %v\n", passwordName, err)
+			return nil, err
+		}
+		passwords = append(passwords, secret{
+			Name:     passwordName,
+			Password: password.Password(),
+		})
+	}
+
+	return passwords, nil
 }

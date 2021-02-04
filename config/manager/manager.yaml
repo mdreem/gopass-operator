@@ -29,7 +29,7 @@ spec:
         - /manager
         args:
         - --leader-elect
-        image: public.ecr.aws/d7n7y2i7/gopass-controller:0.0.3
+        image: public.ecr.aws/d7n7y2i7/gopass-controller:0.0.4
         name: manager
         securityContext:
           allowPrivilegeEscalation: false

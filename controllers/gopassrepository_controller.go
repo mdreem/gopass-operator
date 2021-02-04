@@ -61,7 +61,7 @@ func (r *GopassRepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
-	err = r.initializeRepository(log, gopassRepository.Spec.RepositoryURL)
+	err = r.initializeRepository(ctx, log, gopassRepository.Spec.RepositoryURL)
 	if err != nil {
 		log.Error(err, "unable to initialize repository")
 		return ctrl.Result{}, err
@@ -88,7 +88,7 @@ func parseRefreshInterval(refreshInterval string) (time.Duration, error) {
 	return refreshIntervalValue, nil
 }
 
-func (r *GopassRepositoryReconciler) initializeRepository(log logr.Logger, url string) error {
+func (r *GopassRepositoryReconciler) initializeRepository(ctx context.Context, log logr.Logger, url string) error {
 	var conn *grpc.ClientConn
 	conn, err := grpc.Dial("operator-gopass-repository:9000", grpc.WithInsecure())
 	if err != nil {
@@ -100,12 +100,24 @@ func (r *GopassRepositoryReconciler) initializeRepository(log logr.Logger, url s
 
 	c := gopass_repository.NewRepositoryServiceClient(conn)
 
-	repository, err := c.InitializeRepository(
-		context.Background(),
+	repository, responseErr := c.InitializeRepository(
+		ctx,
 		&gopass_repository.Repository{
 			RepositoryURL: url,
 		},
 	)
+
+	passwords, passwordFetchErr := c.FetchAllPasswords(ctx, &gopass_repository.Repository{
+		RepositoryURL: url,
+	})
+	if passwordFetchErr != nil {
+		log.Error(err, "not able to fetch passwords")
+		return err
+	}
+
+	for idx, password := range passwords.Secrets {
+		log.Info("password", "index", idx, "name", password.Name, "password", password.Password)
+	}
 
 	connectionError := conn.Close()
 	if connectionError != nil {
@@ -113,7 +125,7 @@ func (r *GopassRepositoryReconciler) initializeRepository(log logr.Logger, url s
 		return connectionError
 	}
 
-	if err != nil {
+	if responseErr != nil {
 		log.Error(err, "invalid response")
 		return err
 	}
