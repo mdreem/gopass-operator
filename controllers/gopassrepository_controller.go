@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"regexp"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -239,7 +240,12 @@ func createSecret(secrets *gopass_repository.SecretList, namespacedName types.Na
 func createSecretMap(secrets *gopass_repository.SecretList) map[string]string {
 	newSecretMap := make(map[string]string)
 	for _, secret := range secrets.Secrets {
-		newSecretMap[secret.Name] = secret.Password
+		newSecretMap[rename(secret.Name)] = secret.Password
 	}
 	return newSecretMap
+}
+
+func rename(name string) string {
+	reg, _ := regexp.Compile("[^a-zA-Z0-9 ]+")
+	return reg.ReplaceAllString(name, "-")
 }
