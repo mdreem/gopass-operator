@@ -21,7 +21,7 @@ func main() {
 	repository, err := c.InitializeRepository(
 		context.Background(),
 		&gopass_repository.Repository{
-			RepositoryURL: "TestUrl",
+			RepositoryURL: "ssh://localhost/home/git/password-store",
 		},
 	)
 	if repository == nil {

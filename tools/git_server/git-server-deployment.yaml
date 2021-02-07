@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: git-test-server-deployment
+  labels:
+    app: git-test-server
+spec:
+  selector:
+    matchLabels:
+      app: git-test-server
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: git-test-server
+    spec:
+      containers:
+        - name: gopass-repository
+          image: public.ecr.aws/d7n7y2i7/git-test-server:0.0.8
+          ports:
+            - containerPort: 22
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: git-test-server
+  labels:
+    app: git-test-server
+spec:
+  type: ClusterIP
+  ports:
+    - port: 22
+      protocol: TCP
+  selector:
+    app: git-test-server

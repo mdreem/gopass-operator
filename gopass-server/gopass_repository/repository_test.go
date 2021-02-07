@@ -57,7 +57,7 @@ func TestCloneRepository(t *testing.T) {
 
 	unzip(filepath.Join("resources_test", "password-store.zip"), repoDir, t)
 
-	err := cloneGopassRepo(filepath.Join(repoDir, ".password-store"), targetDir)
+	err := cloneGopassRepo(filepath.Join(repoDir, ".password-store"), targetDir, "", "")
 	if err != nil {
 		t.Errorf("not able to clone repository: %v", err)
 		return
@@ -69,7 +69,7 @@ func TestInitializeNewGopassRepository(t *testing.T) {
 
 	unzip(filepath.Join("resources_test", "password-store.zip"), repoDir, t)
 
-	repository, err := initializeNewGopassRepository(filepath.Join(repoDir, ".password-store"))
+	repository, err := initializeNewGopassRepository(filepath.Join(repoDir, ".password-store"), secret{})
 	if err != nil {
 		t.Errorf("not able to initialize gopass repository: %v\n", err)
 		return

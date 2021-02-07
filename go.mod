@@ -9,6 +9,7 @@ require (
 	github.com/gopasspw/gopass v1.11.0
 	github.com/onsi/ginkgo v1.14.1
 	github.com/onsi/gomega v1.10.2
+	golang.org/x/crypto v0.0.0-20200930160638-afb6bcd081ae
 	google.golang.org/grpc v1.27.0
 	google.golang.org/protobuf v1.25.0
 	gopkg.in/yaml.v2 v2.3.0

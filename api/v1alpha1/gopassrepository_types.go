@@ -20,17 +20,21 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+type SecretKeyRefSpec struct {
+	Name string `json:"name,omitempty"`
+	Key  string `json:"key,omitempty"`
+}
 
 // GopassRepositorySpec defines the desired state of GopassRepository
 type GopassRepositorySpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// Foo is an example field of GopassRepository. Edit GopassRepository_types.go to remove/update
-	RepositoryURL   string `json:"repositoryUrl,omitempty"`
+	// RepositoryUrl points to the URL of the repository
+	RepositoryURL string `json:"repositoryUrl,omitempty"`
+	// RefreshInterval denotes how often the repository should be updated
 	RefreshInterval string `json:"refreshInterval,omitempty"`
+	// UserName used to authenticate authenticate with
+	UserName string `json:"userName,omitempty"`
+	// SecretKeyRef references the Secret to be used to authenticate
+	SecretKeyRef SecretKeyRefSpec `json:"secretKeyRef,omitempty"`
 }
 
 // GopassRepositoryStatus defines the observed state of GopassRepository

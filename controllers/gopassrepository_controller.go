@@ -74,7 +74,7 @@ func (r *GopassRepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
-	err = initializeRepository(ctx, log, gopassRepository.Spec.RepositoryURL, repositoryServiceClient)
+	err = initializeRepository(ctx, log, gopassRepository.Spec.RepositoryURL, repositoryServiceClient, req.Namespace, gopassRepository.Spec)
 	if err != nil {
 		log.Error(err, "unable to initialize repository")
 		return ctrl.Result{}, err
@@ -100,6 +100,27 @@ func (r *GopassRepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	return ctrl.Result{RequeueAfter: interval}, nil
 }
+
+//
+//func (r *GopassRepositoryReconciler) fetchCredentials(ctx context.Context, log logr.Logger, namespace string, secretKeyRef gopassv1alpha1.SecretKeyRefSpec) (string, error) {
+//	secret := corev1.Secret{}
+//	objectKey := client.ObjectKey{
+//		Name:      secretKeyRef.Name,
+//		Namespace: namespace,
+//	}
+//
+//	err := r.Client.Get(ctx, objectKey, &secret)
+//	if err != nil {
+//		log.Error(err, "unable to fetch secret", "secretName", secretKeyRef.Name, "namespace", namespace)
+//		return "", err
+//	}
+//
+//	password, ok := secret.StringData[secretKeyRef.Key]
+//	if !ok {
+//		log.Info("unable to find key in secret", "secretName", secretKeyRef.Name, "key", secretKeyRef.Key, "namespace", namespace)
+//	}
+//	return password, nil
+//}
 
 func closeConnection(log logr.Logger, conn *grpc.ClientConn) {
 	connectionError := conn.Close()
@@ -143,12 +164,19 @@ func fetchAllPasswords(ctx context.Context, log logr.Logger, url string, reposit
 	return passwords, nil
 }
 
-func initializeRepository(ctx context.Context, log logr.Logger, url string, repositoryServiceClient gopass_repository.RepositoryServiceClient) error {
+func initializeRepository(ctx context.Context, log logr.Logger, url string, repositoryServiceClient gopass_repository.RepositoryServiceClient,
+	namespace string, gopassRepositorySpec gopassv1alpha1.GopassRepositorySpec) error {
 	log.Info("attempting to call repository server")
 	repository, responseErr := repositoryServiceClient.InitializeRepository(
 		ctx,
 		&gopass_repository.Repository{
 			RepositoryURL: url,
+			Authentication: &gopass_repository.Authentication{
+				Namespace: namespace,
+				Username:  gopassRepositorySpec.UserName,
+				SecretRef: gopassRepositorySpec.SecretKeyRef.Name,
+				SecretKey: gopassRepositorySpec.SecretKeyRef.Key,
+			},
 		},
 	)
 

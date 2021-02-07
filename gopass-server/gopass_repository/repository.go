@@ -4,9 +4,14 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	"github.com/gopasspw/gopass/pkg/gopass/api"
 	"github.com/mdreem/gopass-operator/pkg/apiclient/gopass_repository"
+	ssh_2 "golang.org/x/crypto/ssh"
 	"io/ioutil"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"log"
 	"os"
 
@@ -31,7 +36,7 @@ type secret struct {
 	Password string
 }
 
-func (r *RepositoryServer) InitializeRepository(_ context.Context, repository *gopass_repository.Repository) (*gopass_repository.RepositoryResponse, error) {
+func (r *RepositoryServer) InitializeRepository(ctx context.Context, repository *gopass_repository.Repository) (*gopass_repository.RepositoryResponse, error) {
 	log.Printf("InitializeRepository called with: %s", (*repository).RepositoryURL)
 
 	_, ok := (r.Repositories)[(*repository).RepositoryURL]
@@ -43,7 +48,13 @@ func (r *RepositoryServer) InitializeRepository(_ context.Context, repository *g
 		}, nil
 	}
 
-	gopassRepository, err := initializeNewGopassRepository((*repository).RepositoryURL)
+	credentials, err := getRepositoryCredentials(ctx, repository.Authentication)
+	if err != nil {
+		log.Printf("error initializing repository: %v", err)
+		return nil, err
+	}
+
+	gopassRepository, err := initializeNewGopassRepository((*repository).RepositoryURL, credentials)
 	if err != nil {
 		log.Printf("error initializing repository: %v", err)
 		return nil, err
@@ -96,14 +107,14 @@ func Initialize() *RepositoryServer {
 	}
 }
 
-func initializeNewGopassRepository(repositoryUrl string) (*gopassRepo, error) {
+func initializeNewGopassRepository(repositoryUrl string, credentials secret) (*gopassRepo, error) {
 	repoDir, err := ioutil.TempDir("", "gopass")
 	if err != nil {
 		log.Printf("not able to create local repository directory: %v", err)
 		return nil, err
 	}
 
-	err = cloneGopassRepo(repositoryUrl, repoDir)
+	err = cloneGopassRepo(repositoryUrl, repoDir, credentials.Name, credentials.Password)
 	if err != nil {
 		log.Printf("not able clone gopass repository with URL %s: %v", repositoryUrl, err)
 		return nil, err
@@ -118,11 +129,22 @@ func initializeNewGopassRepository(repositoryUrl string) (*gopassRepo, error) {
 	return gr, nil
 }
 
-func cloneGopassRepo(repositoryUrl string, path string) error {
+func cloneGopassRepo(repositoryUrl string, path string, username string, password string) error {
+	sshPassword := ssh.Password{
+		User:     username,
+		Password: password,
+		HostKeyCallbackHelper: ssh.HostKeyCallbackHelper{
+			HostKeyCallback: ssh_2.InsecureIgnoreHostKey(),
+		},
+	}
+
+	log.Printf("username: '%s' - password: '%s'\n", username, password)
+
 	_, err := git.PlainClone(path, false, &git.CloneOptions{
 		URL:      repositoryUrl,
 		Depth:    1,
 		Progress: os.Stdout,
+		Auth:     &sshPassword,
 	})
 	return err
 }
@@ -207,4 +229,31 @@ func fetchAllPasswords(ctx context.Context, repo *gopassRepo) ([]secret, error) 
 	}
 
 	return passwords, nil
+}
+
+func getRepositoryCredentials(ctx context.Context, authentication *gopass_repository.Authentication) (secret, error) {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return secret{}, err
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return secret{}, err
+	}
+
+	secretMap, err := clientset.CoreV1().Secrets(authentication.Namespace).Get(ctx, authentication.SecretRef, metav1.GetOptions{})
+	if err != nil {
+		return secret{}, err
+	}
+
+	password, ok := (*secretMap).Data[authentication.SecretKey]
+	if !ok {
+		return secret{}, fmt.Errorf("unable to find key '%s' in secret '%s' in namespace '%s'", authentication.SecretKey, authentication.SecretRef, authentication.Namespace)
+	}
+
+	return secret{
+		Name:     authentication.Username,
+		Password: string(password),
+	}, nil
 }

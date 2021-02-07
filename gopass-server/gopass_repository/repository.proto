@@ -3,8 +3,16 @@ option go_package = "pkg/apiclient/gopass_repository";
 
 package gopass_repository;
 
+message Authentication {
+  string namespace = 1;
+  string username = 2;
+  string secretRef = 3;
+  string secretKey = 4;
+}
+
 message Repository {
   string repositoryURL = 1;
+  Authentication authentication = 2;
 }
 
 message RepositoryResponse {
