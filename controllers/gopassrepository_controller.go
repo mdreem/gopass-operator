@@ -101,27 +101,6 @@ func (r *GopassRepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	return ctrl.Result{RequeueAfter: interval}, nil
 }
 
-//
-//func (r *GopassRepositoryReconciler) fetchCredentials(ctx context.Context, log logr.Logger, namespace string, secretKeyRef gopassv1alpha1.SecretKeyRefSpec) (string, error) {
-//	secret := corev1.Secret{}
-//	objectKey := client.ObjectKey{
-//		Name:      secretKeyRef.Name,
-//		Namespace: namespace,
-//	}
-//
-//	err := r.Client.Get(ctx, objectKey, &secret)
-//	if err != nil {
-//		log.Error(err, "unable to fetch secret", "secretName", secretKeyRef.Name, "namespace", namespace)
-//		return "", err
-//	}
-//
-//	password, ok := secret.StringData[secretKeyRef.Key]
-//	if !ok {
-//		log.Info("unable to find key in secret", "secretName", secretKeyRef.Name, "key", secretKeyRef.Key, "namespace", namespace)
-//	}
-//	return password, nil
-//}
-
 func closeConnection(log logr.Logger, conn *grpc.ClientConn) {
 	connectionError := conn.Close()
 	if connectionError != nil {

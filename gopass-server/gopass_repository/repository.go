@@ -1,6 +1,7 @@
 package gopass_repository
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/go-git/go-git/v5"
@@ -14,6 +15,8 @@ import (
 	"k8s.io/client-go/rest"
 	"log"
 	"os"
+	"os/exec"
+	"syscall"
 
 	"gopkg.in/yaml.v2"
 )
@@ -54,6 +57,12 @@ func (r *RepositoryServer) InitializeRepository(ctx context.Context, repository 
 		return nil, err
 	}
 
+	err = getGpgKey(ctx, repository.Authentication)
+	if err != nil {
+		log.Printf("error fetching gpgKey: %v", err)
+		return nil, err
+	}
+
 	gopassRepository, err := initializeNewGopassRepository((*repository).RepositoryURL, credentials)
 	if err != nil {
 		log.Printf("error initializing repository: %v", err)
@@ -81,6 +90,7 @@ func (r *RepositoryServer) FetchAllPasswords(ctx context.Context, repository *go
 	if !ok {
 		return nil, fmt.Errorf("repository with URL '%s' not found", (*repository).RepositoryURL)
 	}
+
 	passwords, err := fetchAllPasswords(ctx, repo)
 	if err != nil {
 		log.Printf("error fetching passwords: %v", err)
@@ -220,7 +230,7 @@ func fetchAllPasswords(ctx context.Context, repo *gopassRepo) ([]secret, error) 
 		password, err := (*repo).store.Get(ctx, passwordName, "")
 		if err != nil {
 			log.Printf("not able to fetch password '%s': %v\n", passwordName, err)
-			return nil, err
+			continue
 		}
 		passwords = append(passwords, secret{
 			Name:     passwordName,
@@ -256,4 +266,45 @@ func getRepositoryCredentials(ctx context.Context, authentication *gopass_reposi
 		Name:     authentication.Username,
 		Password: string(password),
 	}, nil
+}
+
+func getGpgKey(ctx context.Context, authentication *gopass_repository.Authentication) error {
+	log.Printf("add gpg key")
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return err
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+
+	secretMap, err := clientset.CoreV1().Secrets(authentication.Namespace).Get(ctx, "gpg-key", metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	gpgKey, ok := (*secretMap).Data["gpg-key"]
+	if !ok {
+		return fmt.Errorf("unable to find key '%s' in secret '%s' in namespace '%s'", authentication.SecretKey, authentication.SecretRef, authentication.Namespace)
+	}
+
+	_, err = addKey(ctx, gpgKey)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func addKey(ctx context.Context, key []byte) ([]byte, error) {
+	args := make([]string, 0)
+	args = append(args, "--import")
+	cmd := exec.CommandContext(ctx, "gpg", args...)
+	cmd.Stdin = bytes.NewReader(key)
+	cmd.Stderr = os.Stderr
+	cmd.SysProcAttr = &syscall.SysProcAttr{}
+
+	return cmd.Output()
 }
