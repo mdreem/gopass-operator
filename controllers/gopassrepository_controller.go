@@ -19,10 +19,7 @@ package controllers
 import (
 	"context"
 	"google.golang.org/grpc"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"regexp"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -31,8 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	corev1 "k8s.io/api/core/v1"
 )
 
 // GopassRepositoryReconciler reconciles a GopassRepository object
@@ -86,16 +81,10 @@ func (r *GopassRepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
-	secrets, err := fetchAllPasswords(ctx, log, gopassRepository.Spec.RepositoryURL, repositoryServiceClient)
+	err = updateAllPasswords(ctx, log, req.NamespacedName, gopassRepository.Spec.RepositoryURL, repositoryServiceClient)
 	if err != nil {
 		log.Error(err, "unable to fetch secrets")
 		return ctrl.Result{}, err
-	}
-
-	errUpdateSecretMap := r.updateSecretMap(ctx, log, req.NamespacedName, secrets)
-	if errUpdateSecretMap != nil {
-		log.Error(errUpdateSecretMap, "error updating secret map")
-		return ctrl.Result{}, errUpdateSecretMap
 	}
 
 	return ctrl.Result{RequeueAfter: interval}, nil
@@ -130,23 +119,27 @@ func createRepositoryServiceClient() (gopass_repository.RepositoryServiceClient,
 	return gopass_repository.NewRepositoryServiceClient(conn), conn, nil
 }
 
-func fetchAllPasswords(ctx context.Context, log logr.Logger, url string, repositoryServiceClient gopass_repository.RepositoryServiceClient) (*gopass_repository.SecretList, error) {
-	passwords, err := repositoryServiceClient.FetchAllPasswords(ctx,
+func updateAllPasswords(ctx context.Context, log logr.Logger, namespacedName types.NamespacedName, url string, repositoryServiceClient gopass_repository.RepositoryServiceClient) error {
+	_, err := repositoryServiceClient.UpdateAllPasswords(ctx,
 		&gopass_repository.Repository{
 			RepositoryURL: url,
+			SecretName: &gopass_repository.NamespacedName{
+				Namespace: namespacedName.Namespace,
+				Name:      namespacedName.Name,
+			},
 		})
 
 	if err != nil {
 		log.Error(err, "not able to fetch passwords")
-		return nil, err
+		return err
 	}
-	return passwords, nil
+	return nil
 }
 
 func initializeRepository(ctx context.Context, log logr.Logger, url string, repositoryServiceClient gopass_repository.RepositoryServiceClient,
 	namespace string, gopassRepositorySpec gopassv1alpha1.GopassRepositorySpec) error {
 	log.Info("attempting to call repository server")
-	repository, responseErr := repositoryServiceClient.InitializeRepository(
+	repository, err := repositoryServiceClient.InitializeRepository(
 		ctx,
 		&gopass_repository.Repository{
 			RepositoryURL: url,
@@ -159,19 +152,7 @@ func initializeRepository(ctx context.Context, log logr.Logger, url string, repo
 		},
 	)
 
-	passwords, err := repositoryServiceClient.FetchAllPasswords(ctx, &gopass_repository.Repository{
-		RepositoryURL: url,
-	})
 	if err != nil {
-		log.Error(err, "not able to fetch passwords")
-		return err
-	}
-
-	for idx, password := range passwords.Secrets {
-		log.Info("password", "index", idx, "name", password.Name, "password", password.Password)
-	}
-
-	if responseErr != nil {
 		log.Error(err, "invalid response")
 		return err
 	}
@@ -190,69 +171,4 @@ func (r *GopassRepositoryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&gopassv1alpha1.GopassRepository{}).
 		Complete(r)
-}
-
-func (r *GopassRepositoryReconciler) updateSecretMap(ctx context.Context, log logr.Logger, namespacedName types.NamespacedName, secrets *gopass_repository.SecretList) error {
-	log.Info("updating secret map")
-
-	newSecret := createSecret(secrets, namespacedName)
-
-	secret := corev1.Secret{}
-	objectKey := client.ObjectKey{
-		Name:      namespacedName.Name,
-		Namespace: namespacedName.Namespace,
-	}
-
-	err := r.Client.Get(ctx, objectKey, &secret)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			log.Info("creating secret map")
-
-			err := r.Create(ctx, &newSecret)
-			if err != nil {
-				log.Error(err, "not able to create secret map")
-				return err
-			}
-			return nil
-		} else {
-			log.Error(err, "not able to fetch secret map")
-			return err
-		}
-	}
-
-	secret.StringData = createSecretMap(secrets)
-	err = r.Update(ctx, &secret)
-	if err != nil {
-		log.Error(err, "not able to update secret map")
-		return err
-	}
-
-	return nil
-}
-
-func createSecret(secrets *gopass_repository.SecretList, namespacedName types.NamespacedName) corev1.Secret {
-	newSecretMap := createSecretMap(secrets)
-
-	newSecret := corev1.Secret{
-		TypeMeta: metav1.TypeMeta{},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      namespacedName.Name,
-			Namespace: namespacedName.Namespace,
-		},
-		StringData: newSecretMap,
-	}
-	return newSecret
-}
-
-func createSecretMap(secrets *gopass_repository.SecretList) map[string]string {
-	newSecretMap := make(map[string]string)
-	for _, secret := range secrets.Secrets {
-		newSecretMap[rename(secret.Name)] = secret.Password
-	}
-	return newSecretMap
-}
-
-func rename(name string) string {
-	reg, _ := regexp.Compile("[^a-zA-Z0-9 ]+")
-	return reg.ReplaceAllString(name, "-")
 }

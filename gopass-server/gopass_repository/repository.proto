@@ -10,9 +10,15 @@ message Authentication {
   string secretKey = 4;
 }
 
+message NamespacedName {
+  string namespace = 1;
+  string name = 2;
+}
+
 message Repository {
   string repositoryURL = 1;
   Authentication authentication = 2;
+  NamespacedName SecretName = 3;
 }
 
 message RepositoryResponse {
@@ -32,5 +38,5 @@ message SecretList {
 service RepositoryService {
   rpc InitializeRepository(Repository) returns (RepositoryResponse) {}
   rpc UpdateRepository(Repository) returns (RepositoryResponse) {}
-  rpc FetchAllPasswords(Repository) returns (SecretList) {}
+  rpc UpdateAllPasswords(Repository) returns (RepositoryResponse) {}
 }

@@ -21,17 +21,8 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-type gopassRepo struct {
-	store     *api.Gopass
-	directory string
-}
-
 type config struct {
 	Path string `yaml:"path"`
-}
-
-type RepositoryServer struct {
-	Repositories map[string]*gopassRepo
 }
 
 type secret struct {
@@ -39,7 +30,7 @@ type secret struct {
 	Password string
 }
 
-func (r *RepositoryServer) InitializeRepository(ctx context.Context, repository *gopass_repository.Repository) (*gopass_repository.RepositoryResponse, error) {
+func (r *RepositoryServer) initializeRepository(ctx context.Context, repository *gopass_repository.Repository) (*gopass_repository.RepositoryResponse, error) {
 	log.Printf("InitializeRepository called with: %s", (*repository).RepositoryURL)
 
 	_, ok := (r.Repositories)[(*repository).RepositoryURL]
@@ -77,38 +68,12 @@ func (r *RepositoryServer) InitializeRepository(ctx context.Context, repository 
 	}, nil
 }
 
-func (*RepositoryServer) UpdateRepository(_ context.Context, repository *gopass_repository.Repository) (*gopass_repository.RepositoryResponse, error) {
+func (*RepositoryServer) updateRepository(_ context.Context, repository *gopass_repository.Repository) (*gopass_repository.RepositoryResponse, error) {
 	log.Printf("UpdateRepository called with: %s", (*repository).RepositoryURL)
 	return &gopass_repository.RepositoryResponse{
 		Successful:   true,
 		ErrorMessage: "",
 	}, nil
-}
-
-func (r *RepositoryServer) FetchAllPasswords(ctx context.Context, repository *gopass_repository.Repository) (*gopass_repository.SecretList, error) {
-	repo, ok := (r.Repositories)[(*repository).RepositoryURL]
-	if !ok {
-		return nil, fmt.Errorf("repository with URL '%s' not found", (*repository).RepositoryURL)
-	}
-
-	passwords, err := fetchAllPasswords(ctx, repo)
-	if err != nil {
-		log.Printf("error fetching passwords: %v", err)
-		return nil, err
-	}
-
-	secretList := gopass_repository.SecretList{
-		Secrets: make([]*gopass_repository.Secret, 0),
-	}
-
-	for _, password := range passwords {
-		secretList.Secrets = append(secretList.Secrets, &gopass_repository.Secret{
-			Name:     password.Name,
-			Password: password.Password,
-		})
-	}
-
-	return &secretList, nil
 }
 
 func Initialize() *RepositoryServer {
@@ -215,30 +180,6 @@ func removeFile(file *os.File) {
 	if err != nil {
 		log.Printf("failed to remove file: %v\n", err)
 	}
-}
-
-func fetchAllPasswords(ctx context.Context, repo *gopassRepo) ([]secret, error) {
-	list, err := (*repo).store.List(ctx)
-	if err != nil {
-		log.Printf("not able to list contents of repository: %v\n", err)
-		return nil, err
-	}
-
-	passwords := make([]secret, 0)
-
-	for _, passwordName := range list {
-		password, err := (*repo).store.Get(ctx, passwordName, "")
-		if err != nil {
-			log.Printf("not able to fetch password '%s': %v\n", passwordName, err)
-			continue
-		}
-		passwords = append(passwords, secret{
-			Name:     passwordName,
-			Password: password.Password(),
-		})
-	}
-
-	return passwords, nil
 }
 
 func getRepositoryCredentials(ctx context.Context, authentication *gopass_repository.Authentication) (secret, error) {
