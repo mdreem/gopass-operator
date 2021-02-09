@@ -3,6 +3,7 @@ package gopass_repository
 import (
 	"context"
 	"fmt"
+	"github.com/mdreem/gopass-operator/gopass-server/gopass_repository/cluster"
 	"github.com/mdreem/gopass-operator/pkg/apiclient/gopass_repository"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -49,14 +50,14 @@ func (r *RepositoryServer) updateAllPasswords(ctx context.Context, repository *g
 	return nil
 }
 
-func fetchAllPasswords(ctx context.Context, repo *gopassRepo) ([]secret, error) {
+func fetchAllPasswords(ctx context.Context, repo *gopassRepo) ([]cluster.Secret, error) {
 	list, err := (*repo).store.List(ctx)
 	if err != nil {
 		log.Printf("not able to list contents of repository: %v\n", err)
 		return nil, err
 	}
 
-	passwords := make([]secret, 0)
+	passwords := make([]cluster.Secret, 0)
 
 	for _, passwordName := range list {
 		password, err := (*repo).store.Get(ctx, passwordName, "")
@@ -64,7 +65,7 @@ func fetchAllPasswords(ctx context.Context, repo *gopassRepo) ([]secret, error) 
 			log.Printf("not able to fetch password '%s': %v\n", passwordName, err)
 			continue
 		}
-		passwords = append(passwords, secret{
+		passwords = append(passwords, cluster.Secret{
 			Name:     passwordName,
 			Password: password.Password(),
 		})

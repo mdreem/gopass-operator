@@ -81,6 +81,20 @@ func (r *GopassRepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
+	_, err = repositoryServiceClient.UpdateRepository(ctx, &gopass_repository.Repository{
+		RepositoryURL: gopassRepository.Spec.RepositoryURL,
+		Authentication: &gopass_repository.Authentication{
+			Namespace: req.NamespacedName.Namespace,
+			Username:  gopassRepository.Spec.UserName,
+			SecretRef: gopassRepository.Spec.SecretKeyRef.Name,
+			SecretKey: gopassRepository.Spec.SecretKeyRef.Key,
+		},
+	})
+	if err != nil {
+		log.Error(err, "unable to update repository")
+		return ctrl.Result{}, err
+	}
+
 	err = updateAllPasswords(ctx, log, req.NamespacedName, gopassRepository.Spec.RepositoryURL, repositoryServiceClient)
 	if err != nil {
 		log.Error(err, "unable to fetch secrets")

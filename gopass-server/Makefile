@@ -18,6 +18,9 @@ build_protobuf: gopass_repository/repository.pb.go
 build: build_protobuf
 	go build -o bin/gopass_server cmd/main.go
 
+test: build_protobuf
+	go test -v ./... -covermode=count -coverprofile=coverage.out -tags mock
+
 docker-build: build
 	docker build . -f docker/Dockerfile -t $(IMG)
 

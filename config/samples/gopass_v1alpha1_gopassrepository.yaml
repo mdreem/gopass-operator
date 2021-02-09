@@ -3,5 +3,9 @@ kind: GopassRepository
 metadata:
   name: gopassrepository-sample
 spec:
-  # Add fields here
-  foo: bar
+  refreshInterval: 30s
+  repositoryUrl: "ssh://10.99.230.238/home/git/password-store"
+  userName: "git"
+  secretKeyRef:
+    name: "gopass-test-secret"
+    key: "gopass-test-key"

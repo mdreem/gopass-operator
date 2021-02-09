@@ -3,7 +3,12 @@ package gopass_repository
 import (
 	"archive/zip"
 	"context"
+	"github.com/go-git/go-git/v5"
+	config2 "github.com/go-git/go-git/v5/config"
+	"github.com/mdreem/gopass-operator/gopass-server/gopass_repository/cluster"
+	"github.com/mdreem/gopass-operator/pkg/apiclient/gopass_repository"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -51,13 +56,37 @@ func TestNewServer(t *testing.T) {
 	}
 }
 
+func TestInitializeRepository(t *testing.T) {
+	repoDir := initializeTestRepository(t)
+
+	r := RepositoryServer{
+		Repositories: map[string]*gopassRepo{},
+		Client:       &cluster.KubernetesTestClient{},
+	}
+
+	repo := gopass_repository.Repository{
+		RepositoryURL:  repoDir,
+		Authentication: nil,
+		SecretName:     nil,
+	}
+
+	err := r.initializeRepository(context.Background(), &repo)
+	if err != nil {
+		t.Errorf("not able to initialize repository: %v\n", err)
+		return
+	}
+
+	deleteDirectory(t, repoDir)
+	deleteDirectory(t, r.Repositories[repoDir].directory)
+}
+
 func TestCloneRepository(t *testing.T) {
-	repoDir := t.TempDir()
+	repoDir := initializeTestRepository(t)
 	targetDir := t.TempDir()
 
 	unzip(filepath.Join("resources_test", "password-store.zip"), repoDir, t)
 
-	err := cloneGopassRepo(filepath.Join(repoDir, ".password-store"), targetDir, "", "")
+	_, err := cloneGopassRepo(repoDir, targetDir, "", "")
 	if err != nil {
 		t.Errorf("not able to clone repository: %v", err)
 		return
@@ -65,24 +94,112 @@ func TestCloneRepository(t *testing.T) {
 }
 
 func TestInitializeNewGopassRepository(t *testing.T) {
-	repoDir := t.TempDir()
+	repoDir := initializeTestRepository(t)
 
-	unzip(filepath.Join("resources_test", "password-store.zip"), repoDir, t)
-
-	repository, err := initializeNewGopassRepository(filepath.Join(repoDir, ".password-store"), secret{})
+	repository, err := initializeNewGopassRepository(repoDir, cluster.Secret{})
 	if err != nil {
 		t.Errorf("not able to initialize gopass repository: %v\n", err)
 		return
 	}
 
-	t.Logf("removing: %s", repository.directory)
-	if strings.HasPrefix(repository.directory, os.TempDir()) {
-		err = os.RemoveAll(repository.directory)
+	deleteDirectory(t, repository.directory)
+}
+
+func deleteDirectory(t *testing.T, directory string) {
+	t.Logf("removing: %s", directory)
+	if strings.HasPrefix(directory, os.TempDir()) {
+		err := os.RemoveAll(directory)
 		if err != nil {
-			t.Errorf("not able to remove directory (%s): %v\n", repository.directory, err)
+			t.Errorf("not able to remove directory (%s): %v\n", directory, err)
 			return
 		}
 	}
+}
+
+func TestUpdateGopassRepository(t *testing.T) {
+	remoteRepo := initializeTestRepository(t)
+	localRepo := t.TempDir()
+
+	init, err := git.PlainInit(localRepo, false)
+	if err != nil {
+		t.Errorf("unable to initialize repository: %v\n", err)
+		return
+	}
+
+	_, err = init.CreateRemote(&config2.RemoteConfig{
+		Name: "origin",
+		URLs: []string{
+			remoteRepo,
+		},
+		Fetch: nil,
+	})
+	if err != nil {
+		t.Errorf("unable to create remote: %v\n", err)
+		return
+	}
+
+	gr := gopassRepo{
+		store:      nil,
+		directory:  "",
+		repository: init,
+	}
+
+	r := RepositoryServer{
+		Repositories: map[string]*gopassRepo{
+			"myRepo": &gr,
+		},
+		Client: &cluster.KubernetesTestClient{},
+	}
+
+	repo := gopass_repository.Repository{
+		RepositoryURL:  "myRepo",
+		Authentication: nil,
+		SecretName:     nil,
+	}
+
+	err = r.updateRepository(context.Background(), &repo)
+	if err != nil {
+		t.Errorf("unable to update repository: %v\n", err)
+		return
+	}
+
+	files, err := ioutil.ReadDir(localRepo)
+	if err != nil {
+		t.Errorf("unable to read directory: %v", err)
+	}
+
+	foundFiles := make(map[string]bool)
+	for _, f := range files {
+		foundFiles[f.Name()] = true
+		t.Log(f.Name())
+	}
+
+	if len(foundFiles) != 3 {
+		t.Errorf("expected exactly 3 files, but found %d", len(foundFiles))
+	}
+
+	if !foundFiles[".gpg-id"] {
+		t.Errorf("expected .git in the pulled repository")
+	}
+
+	if !foundFiles[".git"] {
+		t.Errorf("expected .git in the pulled repository")
+	}
+
+	if !foundFiles["testpwd.gpg"] {
+		t.Errorf("expected .git in the pulled repository")
+	}
+
+	deleteDirectory(t, remoteRepo)
+	deleteDirectory(t, localRepo)
+}
+
+func initializeTestRepository(t *testing.T) string {
+	repoDir := t.TempDir()
+
+	unzip(filepath.Join("resources_test", "password-store.zip"), repoDir, t)
+
+	return filepath.Join(repoDir, ".password-store")
 }
 
 func unzip(src string, dest string, t *testing.T) {
