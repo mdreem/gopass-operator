@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	gopassv1alpha1 "github.com/mdreem/gopass-operator/api/v1alpha1"
+	gopassv1alpha1 "github.com/mdreem/gopass-operator/controller/api/v1alpha1"
 	"github.com/mdreem/gopass-operator/pkg/apiclient/gopass_repository"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"

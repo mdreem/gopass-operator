@@ -12,7 +12,11 @@ import (
 func Run() {
 	grpcServer := grpc.NewServer()
 
-	gopassRepoServer := gopass_repository.Initialize()
+	gopassRepoServer, err := gopass_repository.Initialize()
+	if err != nil {
+		log.Fatalf("failed to initialize: %v", err)
+	}
+
 	gopass_repository_grpc.RegisterRepositoryServiceServer(grpcServer, gopassRepoServer)
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", 9000))

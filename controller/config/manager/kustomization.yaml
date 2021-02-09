@@ -13,4 +13,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: public.ecr.aws/d7n7y2i7/gopass-controller
-  newTag: 0.0.4
+  newTag: latest
