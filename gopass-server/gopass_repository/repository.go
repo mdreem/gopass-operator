@@ -116,7 +116,6 @@ func cloneGopassRepo(repositoryUrl string, path string, username string, passwor
 	log.Printf("cloning repository with URL '%s' to %s\n", repositoryUrl, path)
 	repository, err := git.PlainClone(path, false, &git.CloneOptions{
 		URL:      repositoryUrl,
-		Depth:    1,
 		Progress: os.Stdout,
 		Auth:     &sshPassword,
 	})
