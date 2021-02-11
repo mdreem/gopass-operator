@@ -5,6 +5,7 @@ import (
 	"context"
 	"github.com/go-git/go-git/v5"
 	config2 "github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/mdreem/gopass-operator/gopass-server/gopass_repository/cluster"
 	"github.com/mdreem/gopass-operator/pkg/apiclient/gopass_repository"
 	"io"
@@ -13,6 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestNewServer(t *testing.T) {
@@ -105,28 +107,64 @@ func TestInitializeNewGopassRepository(t *testing.T) {
 	deleteDirectory(t, repository.directory)
 }
 
-func deleteDirectory(t *testing.T, directory string) {
-	t.Logf("removing: %s", directory)
-	if strings.HasPrefix(directory, os.TempDir()) {
-		err := os.RemoveAll(directory)
-		if err != nil {
-			t.Errorf("not able to remove directory (%s): %v\n", directory, err)
-			return
-		}
+func TestCloneAndUpdateRepository(t *testing.T) {
+	localRepoDir := initializeTestRepository(t)
+	unzip(filepath.Join("resources_test", "password-store.zip"), localRepoDir, t)
+
+	targetDir := t.TempDir()
+	repository, err := cloneGopassRepo(localRepoDir, targetDir, "", "")
+	if err != nil {
+		t.Errorf("unable to clone repository: %v\n", err)
+		return
 	}
+
+	filename := filepath.Join(localRepoDir, "hello-world-file")
+	err = ioutil.WriteFile(filename, []byte("hello world!"), 0644)
+	if err != nil {
+		t.Errorf("unable to write to file: %v", err)
+		return
+	}
+
+	localRepo, err := git.PlainOpen(localRepoDir)
+	if err != nil {
+		t.Errorf("unable to open repository: %v", err)
+		return
+	}
+
+	worktree, err := localRepo.Worktree()
+	if err != nil {
+		t.Errorf("unable to get worktree: %v", err)
+		return
+	}
+
+	_, err = worktree.Add("hello-world-file")
+	if err != nil {
+		t.Errorf("unable to add file: %v", err)
+		return
+	}
+
+	_, err = worktree.Commit("some commit", &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  "John Doe",
+			Email: "john@doe.org",
+			When:  time.Now(),
+		},
+	})
+
+	r, repo := createRepositoryServer(repository)
+	err = r.updateRepository(context.Background(), &repo)
+	if err != nil {
+		t.Errorf("unable to update repository: %v\n", err)
+		return
+	}
+
 }
 
 func TestUpdateGopassRepository(t *testing.T) {
 	remoteRepo := initializeTestRepository(t)
-	localRepo := t.TempDir()
+	localRepoDir, init, _ := initializeLocalRepository(t)
 
-	init, err := git.PlainInit(localRepo, false)
-	if err != nil {
-		t.Errorf("unable to initialize repository: %v\n", err)
-		return
-	}
-
-	_, err = init.CreateRemote(&config2.RemoteConfig{
+	_, err := init.CreateRemote(&config2.RemoteConfig{
 		Name: "origin",
 		URLs: []string{
 			remoteRepo,
@@ -138,32 +176,14 @@ func TestUpdateGopassRepository(t *testing.T) {
 		return
 	}
 
-	gr := gopassRepo{
-		store:      nil,
-		directory:  "",
-		repository: init,
-	}
-
-	r := RepositoryServer{
-		Repositories: map[string]*gopassRepo{
-			"myRepo": &gr,
-		},
-		Client: &cluster.KubernetesTestClient{},
-	}
-
-	repo := gopass_repository.Repository{
-		RepositoryURL:  "myRepo",
-		Authentication: nil,
-		SecretName:     nil,
-	}
-
+	r, repo := createRepositoryServer(init)
 	err = r.updateRepository(context.Background(), &repo)
 	if err != nil {
 		t.Errorf("unable to update repository: %v\n", err)
 		return
 	}
 
-	files, err := ioutil.ReadDir(localRepo)
+	files, err := ioutil.ReadDir(localRepoDir)
 	if err != nil {
 		t.Errorf("unable to read directory: %v", err)
 	}
@@ -191,7 +211,50 @@ func TestUpdateGopassRepository(t *testing.T) {
 	}
 
 	deleteDirectory(t, remoteRepo)
-	deleteDirectory(t, localRepo)
+	deleteDirectory(t, localRepoDir)
+}
+
+func createRepositoryServer(init *git.Repository) (RepositoryServer, gopass_repository.Repository) {
+	gr := gopassRepo{
+		store:      nil,
+		directory:  "",
+		repository: init,
+	}
+
+	r := RepositoryServer{
+		Repositories: map[string]*gopassRepo{
+			"myRepo": &gr,
+		},
+		Client: &cluster.KubernetesTestClient{},
+	}
+	return r, gopass_repository.Repository{
+		RepositoryURL:  "myRepo",
+		Authentication: nil,
+		SecretName:     nil,
+	}
+}
+
+func initializeLocalRepository(t *testing.T) (string, *git.Repository, error) {
+	localRepoDir := t.TempDir()
+
+	init, err := git.PlainInit(localRepoDir, false)
+	if err != nil {
+		t.Errorf("unable to initialize repository: %v\n", err)
+		return "", nil, err
+	}
+	t.Logf("created repository in %s", localRepoDir)
+	return localRepoDir, init, nil
+}
+
+func deleteDirectory(t *testing.T, directory string) {
+	t.Logf("removing: %s", directory)
+	if strings.HasPrefix(directory, os.TempDir()) {
+		err := os.RemoveAll(directory)
+		if err != nil {
+			t.Errorf("not able to remove directory (%s): %v\n", directory, err)
+			return
+		}
+	}
 }
 
 func initializeTestRepository(t *testing.T) string {
