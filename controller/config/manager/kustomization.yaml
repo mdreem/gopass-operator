@@ -12,5 +12,5 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:
 - name: controller
-  newName: public.ecr.aws/d7n7y2i7/gopass-controller
+  newName: gopass-controller
   newTag: latest

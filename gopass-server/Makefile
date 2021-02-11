@@ -4,8 +4,8 @@ PROTOC_GEN_GO := $(GOPATH)/bin/protoc-gen-go
 SHELL := /bin/bash
 PATH := $(GOPATH)/bin/:$(PATH)
 
-VERSION ?= 0.0.4
-IMG ?= public.ecr.aws/d7n7y2i7/gopass-operator:$(VERSION)
+VERSION ?= latest
+IMG ?= gopass-server:$(VERSION)
 
 $(PROTOC_GEN_GO):
 	go get -u github.com/golang/protobuf/protoc-gen-go
