@@ -106,8 +106,8 @@ jobs:
           name: controller-coverage
           path: controller
 
-#      - uses: codecov/codecov-action@v1
-#        with:
-#          token: ${{ secrets.CODECOV_TOKEN }}
-#          files: ./gopass-server/coverage.out,./controller/cover.out
-#          verbose: true
+      - uses: codecov/codecov-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./gopass-server/coverage.out,./controller/cover.out
+          verbose: true
