@@ -23,3 +23,6 @@ logs-server:
 
 logs-controller:
 	kubectl logs "$$(kubectl get pods -n operator-system | grep "operator-controller-manager[^ ]*" -o)" manager -n operator-system -f
+
+show-pods:
+	kubectl get pods -n operator-system

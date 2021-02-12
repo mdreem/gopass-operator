@@ -6,6 +6,7 @@ require (
 	github.com/go-git/go-git/v5 v5.2.0
 	github.com/go-logr/logr v0.3.0
 	github.com/golang/protobuf v1.4.3
+	github.com/google/uuid v1.1.1
 	github.com/gopasspw/gopass v1.11.0
 	github.com/onsi/ginkgo v1.14.1
 	github.com/onsi/gomega v1.10.2

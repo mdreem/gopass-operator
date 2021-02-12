@@ -42,6 +42,7 @@ type GopassRepositoryReconciler struct {
 // +kubebuilder:rbac:groups=gopass.gopass.operator,resources=gopassrepositories,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=gopass.gopass.operator,resources=gopassrepositories/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=gopass.gopass.operator,resources=gopassrepositories/finalizers,verbs=update
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -63,6 +64,17 @@ func (r *GopassRepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 	defer closeConnection(log, conn)
+
+	deploymentFinished, err := createRepositoryServer(ctx, log, req.NamespacedName)
+	if err != nil {
+		log.Error(err, "not able to deploy repository server")
+		return ctrl.Result{}, err
+	}
+
+	if !deploymentFinished {
+		log.Info("deployment not yet ready")
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
 
 	gopassRepository := &gopassv1alpha1.GopassRepository{}
 	err = r.Get(ctx, req.NamespacedName, gopassRepository)
