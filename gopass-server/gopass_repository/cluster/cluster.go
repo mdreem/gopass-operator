@@ -14,6 +14,9 @@ import (
 	"syscall"
 )
 
+var getRestInClusterConfigFunc = rest.InClusterConfig
+var execCommandContext = exec.CommandContext
+
 type Secret struct {
 	Name     string
 	Password string
@@ -25,11 +28,11 @@ type Client interface {
 }
 
 type KubernetesClient struct {
-	clientset *kubernetes.Clientset
+	clientset kubernetes.Interface
 }
 
 func New() (KubernetesClient, error) {
-	config, err := rest.InClusterConfig()
+	config, err := getRestInClusterConfigFunc()
 	if err != nil {
 		return KubernetesClient{}, err
 	}
@@ -47,6 +50,7 @@ func New() (KubernetesClient, error) {
 func (k *KubernetesClient) GetRepositoryCredentials(ctx context.Context, authentication *gopass_repository.Authentication) (Secret, error) {
 	secretMap, err := k.clientset.CoreV1().Secrets((*authentication).Namespace).Get(ctx, authentication.SecretRef, metav1.GetOptions{})
 	if err != nil {
+		log.Printf("unable to fetch Secret: %v", err)
 		return Secret{}, err
 	}
 
@@ -66,6 +70,7 @@ func (k *KubernetesClient) GetGpgKey(ctx context.Context, authentication *gopass
 
 	secretMap, err := k.clientset.CoreV1().Secrets((*authentication).Namespace).Get(ctx, "gpg-key", metav1.GetOptions{})
 	if err != nil {
+		log.Printf("unable to fetch Secret: %v", err)
 		return err
 	}
 
@@ -76,6 +81,7 @@ func (k *KubernetesClient) GetGpgKey(ctx context.Context, authentication *gopass
 
 	_, err = addKey(ctx, gpgKey)
 	if err != nil {
+		log.Printf("unable to add key: %v", err)
 		return err
 	}
 
@@ -85,7 +91,7 @@ func (k *KubernetesClient) GetGpgKey(ctx context.Context, authentication *gopass
 func addKey(ctx context.Context, key []byte) ([]byte, error) {
 	args := make([]string, 0)
 	args = append(args, "--import")
-	cmd := exec.CommandContext(ctx, "gpg", args...)
+	cmd := execCommandContext(ctx, "gpg", args...)
 	cmd.Stdin = bytes.NewReader(key)
 	cmd.Stderr = os.Stderr
 	cmd.SysProcAttr = &syscall.SysProcAttr{}
