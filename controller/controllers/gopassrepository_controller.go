@@ -30,6 +30,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+var createRepositoryServiceClientFunc = createRepositoryServiceClient
+
 // GopassRepositoryReconciler reconciles a GopassRepository object
 type GopassRepositoryReconciler struct {
 	client.Client
@@ -55,7 +57,7 @@ func (r *GopassRepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	log.Info("reconciliation")
 
-	repositoryServiceClient, conn, err := createRepositoryServiceClient()
+	repositoryServiceClient, conn, err := createRepositoryServiceClientFunc()
 	if err != nil {
 		log.Error(err, "not able to connect to repository server")
 		return ctrl.Result{}, err

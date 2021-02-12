@@ -2,4 +2,4 @@
 
 eval $(minikube docker-env)
 cd ../gopass-server
-IMG="gopass-operator:latest" make docker-build
+IMG="gopass-server:latest" make docker-build
