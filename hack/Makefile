@@ -26,3 +26,9 @@ logs-controller:
 
 show-pods:
 	kubectl get pods -n operator-system
+
+show-deployments:
+	kubectl get deployments -n operator-system
+
+show-gopass-repositories:
+	kubectl get gopassrepository

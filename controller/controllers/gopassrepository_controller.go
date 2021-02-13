@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/types"
 	"time"
@@ -65,12 +66,7 @@ func (r *GopassRepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	err := r.Get(ctx, req.NamespacedName, gopassRepository)
 	if err != nil {
 		log.Error(err, "unable to fetch GopassRepository from request")
-		return ctrl.Result{}, err
-	}
-
-	result, err, done := r.handleDeletion(ctx, req, log, gopassRepository)
-	if done {
-		return result, err
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	repositoryServiceClient, conn, err := createRepositoryServiceClientFunc()
@@ -79,6 +75,11 @@ func (r *GopassRepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 	defer closeConnection(log, conn)
+
+	result, err, done := r.handleDeletion(ctx, req, log, gopassRepository, repositoryServiceClient)
+	if done {
+		return result, err
+	}
 
 	deploymentFinished, err := r.createRepositoryServer(ctx, log, req.NamespacedName)
 	if err != nil {
@@ -126,7 +127,7 @@ func (r *GopassRepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	return ctrl.Result{RequeueAfter: interval}, nil
 }
 
-func (r *GopassRepositoryReconciler) handleDeletion(ctx context.Context, req ctrl.Request, log logr.Logger, repository *gopassv1alpha1.GopassRepository) (ctrl.Result, error, bool) {
+func (r *GopassRepositoryReconciler) handleDeletion(ctx context.Context, req ctrl.Request, log logr.Logger, repository *gopassv1alpha1.GopassRepository, serviceClient gopass_repository.RepositoryServiceClient) (ctrl.Result, error, bool) {
 	if repository.ObjectMeta.DeletionTimestamp.IsZero() {
 		log.Info("preparing to delete")
 		if !containsString(repository.ObjectMeta.Finalizers, finalizerName) {
@@ -137,7 +138,7 @@ func (r *GopassRepositoryReconciler) handleDeletion(ctx context.Context, req ctr
 		}
 	} else {
 		if containsString(repository.ObjectMeta.Finalizers, finalizerName) {
-			err := r.deleteExternalResources(ctx, log, req.NamespacedName)
+			err := r.deleteExternalResources(ctx, log, req.NamespacedName, serviceClient)
 			if err != nil {
 				return ctrl.Result{}, err, true
 			}
@@ -247,7 +248,25 @@ func initializeRepository(ctx context.Context, log logr.Logger, url string, repo
 	return nil
 }
 
-func (r *GopassRepositoryReconciler) deleteExternalResources(ctx context.Context, log logr.Logger, namespacedName types.NamespacedName) error {
+func (r *GopassRepositoryReconciler) deleteExternalResources(ctx context.Context, log logr.Logger, namespacedName types.NamespacedName, serviceClient gopass_repository.RepositoryServiceClient) error {
+	secret, err := serviceClient.DeleteSecret(ctx, &gopass_repository.Repository{
+		SecretName: &gopass_repository.NamespacedName{
+			Namespace: namespacedName.Namespace,
+			Name:      namespacedName.Name,
+		},
+	})
+
+	if err != nil {
+		log.Error(err, "unable to delete secret")
+		return err
+	}
+
+	if !secret.Successful {
+		delError := fmt.Errorf("deletion of secret not successful")
+		log.Error(delError, "deleteExternalResourcesFailed")
+		return delError
+	}
+
 	deployment, err := r.getDeployment(ctx, log, namespacedName)
 	if err != nil {
 		log.Error(err, "unable to get deployment for deleteExternalResources")

@@ -7,6 +7,7 @@ import (
 	"github.com/gopasspw/gopass/pkg/gopass/api"
 	"github.com/mdreem/gopass-operator/gopass-server/gopass_repository/cluster"
 	"github.com/mdreem/gopass-operator/pkg/apiclient/gopass_repository"
+	"k8s.io/apimachinery/pkg/types"
 	"log"
 )
 
@@ -76,5 +77,17 @@ func (r *RepositoryServer) UpdateAllPasswords(ctx context.Context, repository *g
 	return &gopass_repository.RepositoryResponse{
 		Successful:   true,
 		ErrorMessage: "",
+	}, nil
+}
+
+func (r *RepositoryServer) DeleteSecret(ctx context.Context, repository *gopass_repository.Repository) (*gopass_repository.RepositoryResponse, error) {
+	successful, err := deleteSecretMap(ctx, types.NamespacedName{
+		Namespace: repository.SecretName.Namespace,
+		Name:      repository.SecretName.Name,
+	})
+
+	return &gopass_repository.RepositoryResponse{
+		Successful:   successful,
+		ErrorMessage: fmt.Sprintf("failed to delete Secret: %v", err),
 	}, nil
 }

@@ -150,3 +150,31 @@ func rename(name string) string {
 	reg, _ := regexp.Compile("[^a-zA-Z0-9 ]+")
 	return reg.ReplaceAllString(name, "-")
 }
+
+func deleteSecretMap(ctx context.Context, namespacedName types.NamespacedName) (bool, error) {
+	log.Printf("deleting secret")
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return false, err
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return false, err
+	}
+
+	secret, err := getSecretMap(ctx, clientset, namespacedName)
+
+	if secret == nil {
+		log.Printf("secret not found")
+		return true, nil
+	}
+
+	err = clientset.CoreV1().Secrets(namespacedName.Namespace).Delete(ctx, namespacedName.Name, metav1.DeleteOptions{})
+	if err != nil {
+		log.Printf("unable to delete secret: %v", err)
+		return false, err
+	}
+
+	return true, nil
+}

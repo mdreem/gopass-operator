@@ -39,4 +39,5 @@ service RepositoryService {
   rpc InitializeRepository(Repository) returns (RepositoryResponse) {}
   rpc UpdateRepository(Repository) returns (RepositoryResponse) {}
   rpc UpdateAllPasswords(Repository) returns (RepositoryResponse) {}
+  rpc DeleteSecret(Repository) returns (RepositoryResponse) {}
 }
