@@ -19,12 +19,13 @@ type config struct {
 	Path string `yaml:"path"`
 }
 
-func (r *RepositoryServer) initializeRepository(ctx context.Context, repository *gopass_repository.Repository) error {
-	log.Printf("InitializeRepository called with: %s", (*repository).RepositoryURL)
+func (r *RepositoryServer) initializeRepository(ctx context.Context, repositoryInitialization *gopass_repository.RepositoryInitialization) error {
+	log.Printf("InitializeRepository called with: %s", (*repositoryInitialization).Repository.RepositoryURL)
 
-	_, ok := (r.Repositories)[(*repository).RepositoryURL]
+	repository := repositoryInitialization.Repository
+	_, ok := (r.Repositories)[repository.RepositoryURL]
 	if ok {
-		log.Printf("repository with URL '%s' already initialized", (*repository).RepositoryURL)
+		log.Printf("repository with URL '%s' already initialized", repository.RepositoryURL)
 		return nil
 	}
 
@@ -34,19 +35,19 @@ func (r *RepositoryServer) initializeRepository(ctx context.Context, repository 
 		return err
 	}
 
-	err = r.Client.GetGpgKey(ctx, repository.Authentication)
+	err = r.Client.GetGpgKey(ctx, repository.Authentication.Namespace, repositoryInitialization.GpgKeyReference)
 	if err != nil {
 		log.Printf("error fetching gpgKey: %v", err)
 		return err
 	}
 
-	gopassRepository, err := initializeNewGopassRepository((*repository).RepositoryURL, credentials)
+	gopassRepository, err := initializeNewGopassRepository(repository.RepositoryURL, credentials)
 	if err != nil {
 		log.Printf("error initializing repository: %v", err)
 		return err
 	}
 
-	(r.Repositories)[(*repository).RepositoryURL] = gopassRepository
+	(r.Repositories)[repository.RepositoryURL] = gopassRepository
 
 	return nil
 }

@@ -14,6 +14,6 @@ func (*KubernetesTestClient) GetRepositoryCredentials(_ context.Context, _ *gopa
 	return Secret{}, nil
 }
 
-func (*KubernetesTestClient) GetGpgKey(_ context.Context, _ *gopass_repository.Authentication) error {
+func (*KubernetesTestClient) GetGpgKey(_ context.Context, _ string, _ *gopass_repository.GpgKeyReference) error {
 	return nil
 }

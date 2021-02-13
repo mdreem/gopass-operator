@@ -16,6 +16,8 @@ import (
 var getRelevantDeploymentFunc = getRelevantDeployment
 
 func (r *GopassRepositoryReconciler) createRepositoryServer(ctx context.Context, log logr.Logger, namespacedName types.NamespacedName) (bool, error) {
+	appName := namespacedName.Name + "-" + uuid.New().String()
+
 	var deployment *appsv1.Deployment
 	deployment, err := r.getDeployment(ctx, log, namespacedName)
 	if err != nil {
@@ -26,10 +28,27 @@ func (r *GopassRepositoryReconciler) createRepositoryServer(ctx context.Context,
 	if deployment == nil {
 		log.Info("creating deployment")
 
-		deployment = r.createDeployment(namespacedName)
+		deployment = r.createDeployment(namespacedName, appName)
 		err := r.Client.Create(ctx, deployment)
 		if err != nil {
 			log.Error(err, "unable to create deployment")
+			return false, err
+		}
+	}
+
+	var service *corev1.Service
+	service, err = r.getService(ctx, log, namespacedName)
+	if err != nil {
+		log.Error(err, "unable to fetch service")
+		return false, err
+	}
+
+	if service == nil {
+		log.Info("creating service")
+		service = r.createService(namespacedName, appName)
+		err := r.Client.Create(ctx, service)
+		if err != nil {
+			log.Error(err, "unable to create service")
 			return false, err
 		}
 	}
@@ -76,9 +95,38 @@ func getRelevantDeployment(deployments *[]appsv1.Deployment) (*appsv1.Deployment
 	return &(*deployments)[0], nil
 }
 
-func (r *GopassRepositoryReconciler) createDeployment(namespacedName types.NamespacedName) *appsv1.Deployment {
-	appName := namespacedName.Name + "-" + uuid.New().String()
+func (r *GopassRepositoryReconciler) getService(ctx context.Context, log logr.Logger, namespacedName types.NamespacedName) (*corev1.Service, error) {
+	labelSelector := labels.Set{
+		"gopassRepoName":      namespacedName.Name,
+		"gopassRepoNamespace": namespacedName.Namespace,
+	}
 
+	var services = &corev1.ServiceList{}
+	err := r.Client.List(ctx, services, &client.ListOptions{
+		LabelSelector: labelSelector.AsSelector(),
+		Namespace:     r.Namespace,
+	})
+	if err != nil {
+		log.Error(err, "unable to fetch list of services")
+		return nil, err
+	}
+
+	return getRelevantService(&services.Items)
+}
+
+func getRelevantService(services *[]corev1.Service) (*corev1.Service, error) {
+	if len(*services) == 0 {
+		return nil, nil
+	}
+
+	if len(*services) != 1 {
+		return nil, fmt.Errorf("expected 1 deployment, found: %d", len(*services))
+	}
+
+	return &(*services)[0], nil
+}
+
+func (r *GopassRepositoryReconciler) createDeployment(namespacedName types.NamespacedName, appName string) *appsv1.Deployment {
 	deployment := &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
@@ -120,11 +168,41 @@ func (r *GopassRepositoryReconciler) createDeployment(namespacedName types.Names
 	return deployment
 }
 
+func (r *GopassRepositoryReconciler) createService(namespacedName types.NamespacedName, appName string) *corev1.Service {
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:    r.Namespace,
+			GenerateName: namespacedName.Name + "-",
+			Labels: map[string]string{
+				"app":                 appName,
+				"gopassRepoName":      namespacedName.Name,
+				"gopassRepoNamespace": namespacedName.Namespace,
+			},
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Protocol: "TCP",
+					Port:     9000,
+				},
+			},
+			Selector: map[string]string{"app": appName},
+		},
+	}
+
+	return service
+}
+
 func getIntPointer(val int32) *int32 {
 	return &val
 }
 
 func (r *GopassRepositoryReconciler) deleteDeployment(ctx context.Context, deployment *appsv1.Deployment) error {
 	err := r.Client.Delete(ctx, deployment)
+	return err
+}
+
+func (r *GopassRepositoryReconciler) deleteService(ctx context.Context, service *corev1.Service) error {
+	err := r.Client.Delete(ctx, service)
 	return err
 }

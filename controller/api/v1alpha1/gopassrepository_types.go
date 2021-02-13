@@ -35,6 +35,7 @@ type GopassRepositorySpec struct {
 	UserName string `json:"userName,omitempty"`
 	// SecretKeyRef references the Secret to be used to authenticate
 	SecretKeyRef SecretKeyRefSpec `json:"secretKeyRef,omitempty"`
+	GpgKeyRef    SecretKeyRefSpec `json:"gpgKeyRef,omitempty"`
 }
 
 // GopassRepositoryStatus defines the observed state of GopassRepository

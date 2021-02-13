@@ -36,6 +36,13 @@ spec:
           spec:
             description: GopassRepositorySpec defines the desired state of GopassRepository
             properties:
+              gpgKeyRef:
+                properties:
+                  key:
+                    type: string
+                  name:
+                    type: string
+                type: object
               refreshInterval:
                 description: RefreshInterval denotes how often the repository should
                   be updated

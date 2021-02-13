@@ -35,8 +35,8 @@ func Initialize() (*RepositoryServer, error) {
 	}, nil
 }
 
-func (r *RepositoryServer) InitializeRepository(ctx context.Context, repository *gopass_repository.Repository) (*gopass_repository.RepositoryResponse, error) {
-	err := r.initializeRepository(ctx, repository)
+func (r *RepositoryServer) InitializeRepository(ctx context.Context, repositoryInitialization *gopass_repository.RepositoryInitialization) (*gopass_repository.RepositoryResponse, error) {
+	err := r.initializeRepository(ctx, repositoryInitialization)
 	if err != nil {
 		return &gopass_repository.RepositoryResponse{
 			Successful:   false,

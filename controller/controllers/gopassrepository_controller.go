@@ -47,6 +47,7 @@ type GopassRepositoryReconciler struct {
 // +kubebuilder:rbac:groups=gopass.gopass.operator,resources=gopassrepositories/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=gopass.gopass.operator,resources=gopassrepositories/finalizers,verbs=update
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -223,13 +224,19 @@ func initializeRepository(ctx context.Context, log logr.Logger, url string, repo
 	log.Info("attempting to call repository server")
 	repository, err := repositoryServiceClient.InitializeRepository(
 		ctx,
-		&gopass_repository.Repository{
-			RepositoryURL: url,
-			Authentication: &gopass_repository.Authentication{
-				Namespace: namespace,
-				Username:  gopassRepositorySpec.UserName,
-				SecretRef: gopassRepositorySpec.SecretKeyRef.Name,
-				SecretKey: gopassRepositorySpec.SecretKeyRef.Key,
+		&gopass_repository.RepositoryInitialization{
+			Repository: &gopass_repository.Repository{
+				RepositoryURL: url,
+				Authentication: &gopass_repository.Authentication{
+					Namespace: namespace,
+					Username:  gopassRepositorySpec.UserName,
+					SecretRef: gopassRepositorySpec.SecretKeyRef.Name,
+					SecretKey: gopassRepositorySpec.SecretKeyRef.Key,
+				},
+			},
+			GpgKeyReference: &gopass_repository.GpgKeyReference{
+				GpgKeyRef:    gopassRepositorySpec.GpgKeyRef.Name,
+				GpgKeyRefKey: gopassRepositorySpec.GpgKeyRef.Key,
 			},
 		},
 	)
@@ -280,6 +287,21 @@ func (r *GopassRepositoryReconciler) deleteExternalResources(ctx context.Context
 			return err
 		}
 	}
+
+	service, err := r.getService(ctx, log, namespacedName)
+	if err != nil {
+		log.Error(err, "unable to get deployment for deleteExternalResources")
+		return err
+	}
+
+	if service != nil {
+		err = r.deleteService(ctx, service)
+		if err != nil {
+			log.Error(err, "unable to delete service")
+			return err
+		}
+	}
+
 	return nil
 }
 

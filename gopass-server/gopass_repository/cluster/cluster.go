@@ -24,7 +24,7 @@ type Secret struct {
 
 type Client interface {
 	GetRepositoryCredentials(ctx context.Context, authentication *gopass_repository.Authentication) (Secret, error)
-	GetGpgKey(ctx context.Context, authentication *gopass_repository.Authentication) error
+	GetGpgKey(ctx context.Context, namespace string, gpgKeyReference *gopass_repository.GpgKeyReference) error
 }
 
 type KubernetesClient struct {
@@ -65,18 +65,18 @@ func (k *KubernetesClient) GetRepositoryCredentials(ctx context.Context, authent
 	}, nil
 }
 
-func (k *KubernetesClient) GetGpgKey(ctx context.Context, authentication *gopass_repository.Authentication) error {
+func (k *KubernetesClient) GetGpgKey(ctx context.Context, namespace string, gpgKeyReference *gopass_repository.GpgKeyReference) error {
 	log.Printf("add gpg key")
 
-	secretMap, err := k.clientset.CoreV1().Secrets((*authentication).Namespace).Get(ctx, "gpg-key", metav1.GetOptions{})
+	secretMap, err := k.clientset.CoreV1().Secrets(namespace).Get(ctx, gpgKeyReference.GpgKeyRef, metav1.GetOptions{})
 	if err != nil {
 		log.Printf("unable to fetch Secret: %v", err)
 		return err
 	}
 
-	gpgKey, ok := (*secretMap).Data["gpg-key"]
+	gpgKey, ok := (*secretMap).Data[gpgKeyReference.GpgKeyRefKey]
 	if !ok {
-		return fmt.Errorf("unable to find key '%s' in secret '%s' in namespace '%s'", authentication.SecretKey, authentication.SecretRef, authentication.Namespace)
+		return fmt.Errorf("unable to find key '%s' in secret '%s' in namespace '%s'", gpgKeyReference.GpgKeyRef, gpgKeyReference.GpgKeyRefKey, namespace)
 	}
 
 	_, err = addKey(ctx, gpgKey)

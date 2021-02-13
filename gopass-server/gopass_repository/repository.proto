@@ -21,6 +21,16 @@ message Repository {
   NamespacedName SecretName = 3;
 }
 
+message GpgKeyReference {
+  string gpgKeyRef = 1;
+  string gpgKeyRefKey = 2;
+}
+
+message RepositoryInitialization {
+  Repository repository = 1;
+  GpgKeyReference gpgKeyReference = 2;
+}
+
 message RepositoryResponse {
   bool successful = 1;
   string errorMessage = 2;
@@ -36,7 +46,7 @@ message SecretList {
 }
 
 service RepositoryService {
-  rpc InitializeRepository(Repository) returns (RepositoryResponse) {}
+  rpc InitializeRepository(RepositoryInitialization) returns (RepositoryResponse) {}
   rpc UpdateRepository(Repository) returns (RepositoryResponse) {}
   rpc UpdateAllPasswords(Repository) returns (RepositoryResponse) {}
   rpc DeleteSecret(Repository) returns (RepositoryResponse) {}

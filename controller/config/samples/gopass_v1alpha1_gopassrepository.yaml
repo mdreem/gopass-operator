@@ -9,3 +9,6 @@ spec:
   secretKeyRef:
     name: "gopass-test-secret"
     key: "gopass-test-key"
+  gpgKeyRef:
+    name: "gpg-key"
+    key: "gpg-key"

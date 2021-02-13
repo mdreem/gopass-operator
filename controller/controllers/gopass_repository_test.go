@@ -19,8 +19,8 @@ func InitializeTestRepositoryServer() *TestRepositoryServer {
 	}
 }
 
-func (r *TestRepositoryServer) InitializeRepository(_ context.Context, repository *gopass_repository.Repository) (*gopass_repository.RepositoryResponse, error) {
-	r.Calls["InitializeRepository"] = append(r.Calls["InitializeRepository"], repository.RepositoryURL)
+func (r *TestRepositoryServer) InitializeRepository(_ context.Context, repository *gopass_repository.RepositoryInitialization) (*gopass_repository.RepositoryResponse, error) {
+	r.Calls["InitializeRepository"] = append(r.Calls["InitializeRepository"], repository.Repository.RepositoryURL)
 	return &gopass_repository.RepositoryResponse{
 		Successful:   true,
 		ErrorMessage: "",
