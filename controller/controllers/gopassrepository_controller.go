@@ -30,6 +30,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const finalizerName = "gopass.repository.finalizer"
+
 var createRepositoryServiceClientFunc = createRepositoryServiceClient
 
 // GopassRepositoryReconciler reconciles a GopassRepository object
@@ -57,7 +59,19 @@ type GopassRepositoryReconciler struct {
 func (r *GopassRepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("gopassrepository", req.NamespacedName)
 
-	log.Info("reconciliation")
+	log.Info("called reconcile for gopassRepository")
+
+	gopassRepository := &gopassv1alpha1.GopassRepository{}
+	err := r.Get(ctx, req.NamespacedName, gopassRepository)
+	if err != nil {
+		log.Error(err, "unable to fetch GopassRepository from request")
+		return ctrl.Result{}, err
+	}
+
+	result, err, done := r.handleDeletion(ctx, req, log, gopassRepository)
+	if done {
+		return result, err
+	}
 
 	repositoryServiceClient, conn, err := createRepositoryServiceClientFunc()
 	if err != nil {
@@ -75,13 +89,6 @@ func (r *GopassRepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	if !deploymentFinished {
 		log.Info("deployment not yet ready")
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
-	}
-
-	gopassRepository := &gopassv1alpha1.GopassRepository{}
-	err = r.Get(ctx, req.NamespacedName, gopassRepository)
-	if err != nil {
-		log.Error(err, "unable to fetch data from request")
-		return ctrl.Result{}, err
 	}
 
 	err = initializeRepository(ctx, log, gopassRepository.Spec.RepositoryURL, repositoryServiceClient, req.Namespace, gopassRepository.Spec)
@@ -117,6 +124,51 @@ func (r *GopassRepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	return ctrl.Result{RequeueAfter: interval}, nil
+}
+
+func (r *GopassRepositoryReconciler) handleDeletion(ctx context.Context, req ctrl.Request, log logr.Logger, repository *gopassv1alpha1.GopassRepository) (ctrl.Result, error, bool) {
+	if repository.ObjectMeta.DeletionTimestamp.IsZero() {
+		log.Info("preparing to delete")
+		if !containsString(repository.ObjectMeta.Finalizers, finalizerName) {
+			repository.ObjectMeta.Finalizers = append(repository.ObjectMeta.Finalizers, finalizerName)
+			if err := r.Update(context.Background(), repository); err != nil {
+				return ctrl.Result{}, err, true
+			}
+		}
+	} else {
+		if containsString(repository.ObjectMeta.Finalizers, finalizerName) {
+			err := r.deleteExternalResources(ctx, log, req.NamespacedName)
+			if err != nil {
+				return ctrl.Result{}, err, true
+			}
+
+			repository.ObjectMeta.Finalizers = removeString(repository.ObjectMeta.Finalizers, finalizerName)
+			if err := r.Update(context.Background(), repository); err != nil {
+				return ctrl.Result{}, err, true
+			}
+		}
+		return ctrl.Result{}, nil, true
+	}
+	return ctrl.Result{}, nil, false
+}
+
+func containsString(slice []string, s string) bool {
+	for _, item := range slice {
+		if item == s {
+			return true
+		}
+	}
+	return false
+}
+
+func removeString(slice []string, s string) (result []string) {
+	for _, item := range slice {
+		if item == s {
+			continue
+		}
+		result = append(result, item)
+	}
+	return
 }
 
 func closeConnection(log logr.Logger, conn *grpc.ClientConn) {
@@ -192,6 +244,23 @@ func initializeRepository(ctx context.Context, log logr.Logger, url string, repo
 		log.Info("empty response from repository server")
 	}
 
+	return nil
+}
+
+func (r *GopassRepositoryReconciler) deleteExternalResources(ctx context.Context, log logr.Logger, namespacedName types.NamespacedName) error {
+	deployment, err := r.getDeployment(ctx, log, namespacedName)
+	if err != nil {
+		log.Error(err, "unable to get deployment for deleteExternalResources")
+		return err
+	}
+
+	if deployment != nil {
+		err = r.deleteDeployment(ctx, deployment)
+		if err != nil {
+			log.Error(err, "unable to delete deployment")
+			return err
+		}
+	}
 	return nil
 }
 

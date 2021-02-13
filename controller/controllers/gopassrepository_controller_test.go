@@ -79,25 +79,25 @@ var _ = Describe("GopassRepository", func() {
 					return false
 				}
 				return true
-			}, timeout, interval).Should(BeTrue())
+			}, timeout, interval).Should(BeTrue(), "wait for GopassRepository to be created")
 
 			Expect(createdGopassRepository.Spec.UserName).Should(Equal(UserName))
 
 			Eventually(func() bool {
 				return len((*testRepositoryServiceServer).Calls["InitializeRepository"]) > 0
-			}, timeout, interval).Should(BeTrue())
+			}, timeout, interval).Should(BeTrue(), "wait for repository server to be called")
 
 			initializeRepositoryCalls := (*testRepositoryServiceServer).Calls["InitializeRepository"]
-			Expect(len(initializeRepositoryCalls)).Should(Equal(1))
-			Expect(initializeRepositoryCalls[0]).Should(Equal(RepositoryUrl))
+			Expect(len(initializeRepositoryCalls)).Should(Equal(2), "correct number of calls to InitializeRepository")
+			Expect(initializeRepositoryCalls[0]).Should(Equal(RepositoryUrl), "calls to InitializeRepository should contain correct URL")
 
 			updateRepositoryCalls := (*testRepositoryServiceServer).Calls["UpdateRepository"]
-			Expect(len(updateRepositoryCalls)).Should(Equal(1))
-			Expect(updateRepositoryCalls[0]).Should(Equal(RepositoryUrl))
+			Expect(len(updateRepositoryCalls)).Should(Equal(2), "correct number of calls to UpdateRepository")
+			Expect(updateRepositoryCalls[0]).Should(Equal(RepositoryUrl), "calls to UpdateRepository should contain correct URL")
 
 			updateAllPasswordsCalls := (*testRepositoryServiceServer).Calls["UpdateAllPasswords"]
-			Expect(len(updateAllPasswordsCalls)).Should(Equal(1))
-			Expect(updateAllPasswordsCalls[0]).Should(Equal(RepositoryUrl))
+			Expect(len(updateAllPasswordsCalls)).Should(Equal(2), "correct number of calls to UpdateAllPasswords")
+			Expect(updateAllPasswordsCalls[0]).Should(Equal(RepositoryUrl), "calls to UpdateAllPasswords should contain correct URL")
 		})
 	})
 })

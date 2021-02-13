@@ -123,3 +123,8 @@ func (r *GopassRepositoryReconciler) createDeployment(namespacedName types.Names
 func getIntPointer(val int32) *int32 {
 	return &val
 }
+
+func (r *GopassRepositoryReconciler) deleteDeployment(ctx context.Context, deployment *appsv1.Deployment) error {
+	err := r.Client.Delete(ctx, deployment)
+	return err
+}
