@@ -25,7 +25,7 @@ type gopassRepo struct {
 func Initialize() (*RepositoryServer, error) {
 	someClient, err := cluster.New()
 	if err != nil {
-		log.Printf("")
+		log.Printf("unable to create client: %v", err)
 		return nil, err
 	}
 

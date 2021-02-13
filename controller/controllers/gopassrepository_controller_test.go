@@ -88,15 +88,15 @@ var _ = Describe("GopassRepository", func() {
 			}, timeout, interval).Should(BeTrue(), "wait for repository server to be called")
 
 			initializeRepositoryCalls := (*testRepositoryServiceServer).Calls["InitializeRepository"]
-			Expect(len(initializeRepositoryCalls)).Should(Equal(2), "correct number of calls to InitializeRepository")
+			Expect(len(initializeRepositoryCalls)).Should(Equal(1), "correct number of calls to InitializeRepository")
 			Expect(initializeRepositoryCalls[0]).Should(Equal(RepositoryUrl), "calls to InitializeRepository should contain correct URL")
 
 			updateRepositoryCalls := (*testRepositoryServiceServer).Calls["UpdateRepository"]
-			Expect(len(updateRepositoryCalls)).Should(Equal(2), "correct number of calls to UpdateRepository")
+			Expect(len(updateRepositoryCalls)).Should(Equal(1), "correct number of calls to UpdateRepository")
 			Expect(updateRepositoryCalls[0]).Should(Equal(RepositoryUrl), "calls to UpdateRepository should contain correct URL")
 
 			updateAllPasswordsCalls := (*testRepositoryServiceServer).Calls["UpdateAllPasswords"]
-			Expect(len(updateAllPasswordsCalls)).Should(Equal(2), "correct number of calls to UpdateAllPasswords")
+			Expect(len(updateAllPasswordsCalls)).Should(Equal(1), "correct number of calls to UpdateAllPasswords")
 			Expect(updateAllPasswordsCalls[0]).Should(Equal(RepositoryUrl), "calls to UpdateAllPasswords should contain correct URL")
 		})
 	})
@@ -118,7 +118,8 @@ func initializeTestServer(server *TestRepositoryServer) (*TestRepositoryServer, 
 	return server, nil
 }
 
-func createRepositoryServiceClientForTesting() (gopass_repository.RepositoryServiceClient, *grpc.ClientConn, error) {
+func createRepositoryServiceClientForTesting(targetUrl string) (gopass_repository.RepositoryServiceClient, *grpc.ClientConn, error) {
+	fmt.Printf("createRepositoryServiceClientForTesting called with targetUrl='%s'", targetUrl)
 	var conn *grpc.ClientConn
 	conn, err := grpc.Dial("localhost:12345", grpc.WithInsecure())
 	if err != nil {

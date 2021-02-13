@@ -19,7 +19,7 @@ restart-all: restart-repository restart-controller
 build-restart: all restart-all
 
 logs-server:
-	kubectl logs "$$(kubectl get pods -n operator-system | grep "operator-gopass-repository-deployment[^ ]*" -o)" -n operator-system -f
+	kubectl logs "$$(kubectl get pods -n operator-system | grep "gopassrepository-[^ ]*" -o)" -n operator-system -f
 
 logs-controller:
 	kubectl logs "$$(kubectl get pods -n operator-system | grep "operator-controller-manager[^ ]*" -o)" manager -n operator-system -f

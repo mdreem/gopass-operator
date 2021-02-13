@@ -70,12 +70,18 @@ func (r *GopassRepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	repositoryServiceClient, conn, err := createRepositoryServiceClientFunc()
-	if err != nil {
-		log.Error(err, "not able to connect to repository server")
-		return ctrl.Result{}, err
+	service, err := r.getService(ctx, log, req.NamespacedName)
+
+	var repositoryServiceClient gopass_repository.RepositoryServiceClient
+	if service != nil {
+		var conn *grpc.ClientConn
+		repositoryServiceClient, conn, err = createRepositoryServiceClientFunc(service.Name)
+		if err != nil {
+			log.Error(err, "not able to connect to repository server")
+			return ctrl.Result{}, err
+		}
+		defer closeConnection(log, conn)
 	}
-	defer closeConnection(log, conn)
 
 	result, err, done := r.handleDeletion(ctx, req, log, gopassRepository, repositoryServiceClient)
 	if done {
@@ -90,6 +96,11 @@ func (r *GopassRepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	if !deploymentFinished {
 		log.Info("deployment not yet ready")
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
+
+	if service == nil {
+		log.Info("service did not exist yet")
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
 
@@ -193,9 +204,9 @@ func parseRefreshInterval(refreshInterval string) (time.Duration, error) {
 	return refreshIntervalValue, nil
 }
 
-func createRepositoryServiceClient() (gopass_repository.RepositoryServiceClient, *grpc.ClientConn, error) {
+func createRepositoryServiceClient(targetUrl string) (gopass_repository.RepositoryServiceClient, *grpc.ClientConn, error) {
 	var conn *grpc.ClientConn
-	conn, err := grpc.Dial("operator-gopass-repository:9000", grpc.WithInsecure())
+	conn, err := grpc.Dial(targetUrl+":9000", grpc.WithInsecure())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -256,22 +267,22 @@ func initializeRepository(ctx context.Context, log logr.Logger, url string, repo
 }
 
 func (r *GopassRepositoryReconciler) deleteExternalResources(ctx context.Context, log logr.Logger, namespacedName types.NamespacedName, serviceClient gopass_repository.RepositoryServiceClient) error {
-	secret, err := serviceClient.DeleteSecret(ctx, &gopass_repository.Repository{
-		SecretName: &gopass_repository.NamespacedName{
-			Namespace: namespacedName.Namespace,
-			Name:      namespacedName.Name,
-		},
-	})
-
-	if err != nil {
-		log.Error(err, "unable to delete secret")
-		return err
-	}
-
-	if !secret.Successful {
-		delError := fmt.Errorf("deletion of secret not successful")
-		log.Error(delError, "deleteExternalResourcesFailed")
-		return delError
+	if serviceClient != nil {
+		secret, err := serviceClient.DeleteSecret(ctx, &gopass_repository.Repository{
+			SecretName: &gopass_repository.NamespacedName{
+				Namespace: namespacedName.Namespace,
+				Name:      namespacedName.Name,
+			},
+		})
+		if err != nil {
+			log.Error(err, "unable to delete secret")
+			return err
+		}
+		if !secret.Successful {
+			delError := fmt.Errorf("deletion of secret not successful")
+			log.Error(delError, "deleteExternalResourcesFailed")
+			return delError
+		}
 	}
 
 	deployment, err := r.getDeployment(ctx, log, namespacedName)
