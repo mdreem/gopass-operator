@@ -35,8 +35,9 @@ var createRepositoryServiceClientFunc = createRepositoryServiceClient
 // GopassRepositoryReconciler reconciles a GopassRepository object
 type GopassRepositoryReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	Log       logr.Logger
+	Scheme    *runtime.Scheme
+	Namespace string
 }
 
 // +kubebuilder:rbac:groups=gopass.gopass.operator,resources=gopassrepositories,verbs=get;list;watch;create;update;patch;delete
@@ -65,7 +66,7 @@ func (r *GopassRepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 	defer closeConnection(log, conn)
 
-	deploymentFinished, err := createRepositoryServer(ctx, log, req.NamespacedName)
+	deploymentFinished, err := r.createRepositoryServer(ctx, log, req.NamespacedName)
 	if err != nil {
 		log.Error(err, "not able to deploy repository server")
 		return ctrl.Result{}, err

@@ -10,23 +10,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func createRepositoryServer(ctx context.Context, log logr.Logger, namespacedName types.NamespacedName) (bool, error) {
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		return false, err
-	}
+var getRelevantDeploymentFunc = getRelevantDeployment
 
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return false, err
-	}
-
-	deployment, err := getDeployment(ctx, clientset, namespacedName)
+func (r *GopassRepositoryReconciler) createRepositoryServer(ctx context.Context, log logr.Logger, namespacedName types.NamespacedName) (bool, error) {
+	var deployment *appsv1.Deployment
+	deployment, err := r.getDeployment(ctx, log, namespacedName)
 	if err != nil {
 		log.Error(err, "unable to fetch deployment")
 		return false, err
@@ -35,8 +26,8 @@ func createRepositoryServer(ctx context.Context, log logr.Logger, namespacedName
 	if deployment == nil {
 		log.Info("creating deployment")
 
-		newDeployment := createDeployment(namespacedName)
-		_, err := clientset.AppsV1().Deployments("operator-system").Create(ctx, newDeployment, metav1.CreateOptions{})
+		deployment = r.createDeployment(namespacedName)
+		err := r.Client.Create(ctx, deployment)
 		if err != nil {
 			log.Error(err, "unable to create deployment")
 			return false, err
@@ -54,37 +45,44 @@ func createRepositoryServer(ctx context.Context, log logr.Logger, namespacedName
 	return false, nil
 }
 
-func getDeployment(ctx context.Context, clientset *kubernetes.Clientset, namespacedName types.NamespacedName) (*appsv1.Deployment, error) {
+func (r *GopassRepositoryReconciler) getDeployment(ctx context.Context, log logr.Logger, namespacedName types.NamespacedName) (*appsv1.Deployment, error) {
 	labelSelector := labels.Set{
 		"gopassRepoName":      namespacedName.Name,
 		"gopassRepoNamespace": namespacedName.Namespace,
 	}
 
-	deployments, err := clientset.AppsV1().Deployments("operator-system").List(ctx, metav1.ListOptions{
-		LabelSelector: labelSelector.AsSelector().String(),
+	var deployments = &appsv1.DeploymentList{}
+	err := r.Client.List(ctx, deployments, &client.ListOptions{
+		LabelSelector: labelSelector.AsSelector(),
+		Namespace:     r.Namespace,
 	})
 	if err != nil {
+		log.Error(err, "unable to fetch list of deployments")
 		return nil, err
 	}
 
-	if len(deployments.Items) == 0 {
+	return getRelevantDeploymentFunc(&deployments.Items)
+}
+
+func getRelevantDeployment(deployments *[]appsv1.Deployment) (*appsv1.Deployment, error) {
+	if len(*deployments) == 0 {
 		return nil, nil
 	}
 
-	if len(deployments.Items) != 1 {
-		return nil, fmt.Errorf("expected 1 deployment, found: %d", len(deployments.Items))
+	if len(*deployments) != 1 {
+		return nil, fmt.Errorf("expected 1 deployment, found: %d", len(*deployments))
 	}
 
-	return &deployments.Items[0], nil
+	return &(*deployments)[0], nil
 }
 
-func createDeployment(namespacedName types.NamespacedName) *appsv1.Deployment {
+func (r *GopassRepositoryReconciler) createDeployment(namespacedName types.NamespacedName) *appsv1.Deployment {
 	appName := namespacedName.Name + "-" + uuid.New().String()
 
 	deployment := &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace:    "operator-system",
+			Namespace:    r.Namespace,
 			GenerateName: namespacedName.Name + "-",
 			Labels: map[string]string{
 				"app":                 appName,

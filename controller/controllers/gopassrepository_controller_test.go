@@ -8,6 +8,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"google.golang.org/grpc"
+	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"net"
@@ -34,7 +35,16 @@ var _ = Describe("GopassRepository", func() {
 		It("Should initialize a new gopass repository", func() {
 			ctx := context.Background()
 
+			originalCreateRepositoryServiceClientFunc := createRepositoryServiceClient
+			originalGetRelevantDeploymentFunc := getRelevantDeployment
+
 			createRepositoryServiceClientFunc = createRepositoryServiceClientForTesting
+			getRelevantDeploymentFunc = getRelevantDeploymentMock
+
+			defer func() {
+				createRepositoryServiceClientFunc = originalCreateRepositoryServiceClientFunc
+				getRelevantDeploymentFunc = originalGetRelevantDeploymentFunc
+			}()
 
 			testRepositoryServiceServer := InitializeTestRepositoryServer()
 			go func() {
@@ -115,4 +125,12 @@ func createRepositoryServiceClientForTesting() (gopass_repository.RepositoryServ
 		return nil, nil, err
 	}
 	return gopass_repository.NewRepositoryServiceClient(conn), conn, nil
+}
+
+func getRelevantDeploymentMock(deployments *[]appsv1.Deployment) (*appsv1.Deployment, error) {
+	return &appsv1.Deployment{
+		Status: appsv1.DeploymentStatus{
+			AvailableReplicas: 1,
+		},
+	}, nil
 }
