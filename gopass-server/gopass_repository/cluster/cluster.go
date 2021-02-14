@@ -76,7 +76,7 @@ func (k *KubernetesClient) GetGpgKey(ctx context.Context, namespace string, gpgK
 
 	gpgKey, ok := (*secretMap).Data[gpgKeyReference.GpgKeyRefKey]
 	if !ok {
-		return fmt.Errorf("unable to find key '%s' in secret '%s' in namespace '%s'", gpgKeyReference.GpgKeyRef, gpgKeyReference.GpgKeyRefKey, namespace)
+		return fmt.Errorf("unable to find key '%s' in secret '%s' in namespace '%s'", gpgKeyReference.GpgKeyRefKey, gpgKeyReference.GpgKeyRef, namespace)
 	}
 
 	_, err = addKey(ctx, gpgKey)

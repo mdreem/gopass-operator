@@ -66,13 +66,20 @@ func TestInitializeRepository(t *testing.T) {
 		Client:       &cluster.KubernetesTestClient{},
 	}
 
-	repo := gopass_repository.Repository{
-		RepositoryURL:  repoDir,
-		Authentication: nil,
-		SecretName:     nil,
+	repositoryInitialization := gopass_repository.RepositoryInitialization{
+		Repository: &gopass_repository.Repository{
+			RepositoryURL: repoDir,
+			Authentication: &gopass_repository.Authentication{
+				Namespace: "testNameSpace",
+				Username:  "testUsername",
+				SecretRef: "testSecretRef",
+				SecretKey: "testSecretKey",
+			},
+			SecretName: nil,
+		},
 	}
 
-	err := r.initializeRepository(context.Background(), &repo)
+	err := r.initializeRepository(context.Background(), &repositoryInitialization)
 	if err != nil {
 		t.Errorf("not able to initialize repository: %v\n", err)
 		return

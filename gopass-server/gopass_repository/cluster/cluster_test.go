@@ -198,8 +198,8 @@ func TestKubernetesClient_GetGpgKey(t *testing.T) {
 		clientset kubernetes.Interface
 	}
 	type args struct {
-		ctx            context.Context
-		authentication *gopass_repository.Authentication
+		ctx             context.Context
+		gpgKeyReference *gopass_repository.GpgKeyReference
 	}
 	tests := []struct {
 		name            string
@@ -219,18 +219,16 @@ func TestKubernetesClient_GetGpgKey(t *testing.T) {
 							Namespace: "testNameSpace",
 						},
 						Data: map[string][]byte{
-							"gpg-key": []byte("my secret"),
+							"gpg-key-ref": []byte("my secret"),
 						},
 					},
 				),
 			},
 			args: args{
 				ctx: context.Background(),
-				authentication: &gopass_repository.Authentication{
-					Namespace: "testNameSpace",
-					Username:  "",
-					SecretRef: "",
-					SecretKey: "",
+				gpgKeyReference: &gopass_repository.GpgKeyReference{
+					GpgKeyRef:    "gpg-key",
+					GpgKeyRefKey: "gpg-key-ref",
 				},
 			},
 			letCommandFail:  false,
@@ -247,18 +245,16 @@ func TestKubernetesClient_GetGpgKey(t *testing.T) {
 							Namespace: "testNameSpace",
 						},
 						Data: map[string][]byte{
-							"gpg-key": []byte("my secret"),
+							"gpg-key-ref": []byte("my secret"),
 						},
 					},
 				),
 			},
 			args: args{
 				ctx: context.Background(),
-				authentication: &gopass_repository.Authentication{
-					Namespace: "testNameSpace",
-					Username:  "",
-					SecretRef: "",
-					SecretKey: "",
+				gpgKeyReference: &gopass_repository.GpgKeyReference{
+					GpgKeyRef:    "gpg-key",
+					GpgKeyRefKey: "gpg-key-ref",
 				},
 			},
 			letCommandFail:  false,
@@ -282,16 +278,14 @@ func TestKubernetesClient_GetGpgKey(t *testing.T) {
 			},
 			args: args{
 				ctx: context.Background(),
-				authentication: &gopass_repository.Authentication{
-					Namespace: "testNameSpace",
-					Username:  "",
-					SecretRef: "",
-					SecretKey: "",
+				gpgKeyReference: &gopass_repository.GpgKeyReference{
+					GpgKeyRef:    "gpg-key",
+					GpgKeyRefKey: "wrong-gpg-key-ref",
 				},
 			},
 			letCommandFail:  false,
 			wantErr:         true,
-			wantedErrorText: "unable to find key '' in secret '' in namespace 'testNameSpace'",
+			wantedErrorText: "unable to find key 'wrong-gpg-key-ref' in secret 'gpg-key' in namespace 'testNameSpace'",
 		},
 		{
 			name: "fail to add key due to issue executing gpg",
@@ -303,18 +297,16 @@ func TestKubernetesClient_GetGpgKey(t *testing.T) {
 							Namespace: "testNameSpace",
 						},
 						Data: map[string][]byte{
-							"gpg-key": []byte("my secret"),
+							"gpg-key-ref": []byte("my secret"),
 						},
 					},
 				),
 			},
 			args: args{
 				ctx: context.Background(),
-				authentication: &gopass_repository.Authentication{
-					Namespace: "testNameSpace",
-					Username:  "",
-					SecretRef: "",
-					SecretKey: "",
+				gpgKeyReference: &gopass_repository.GpgKeyReference{
+					GpgKeyRef:    "gpg-key",
+					GpgKeyRefKey: "gpg-key-ref",
 				},
 			},
 			letCommandFail:  true,
@@ -338,7 +330,7 @@ func TestKubernetesClient_GetGpgKey(t *testing.T) {
 				execCommandContext = originalExecCommandContext
 			}()
 
-			err := k.GetGpgKey(tt.args.ctx, tt.args.authentication)
+			err := k.GetGpgKey(tt.args.ctx, "testNameSpace", tt.args.gpgKeyReference)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetGpgKey() error = %v, wantErr %v", err, tt.wantErr)
