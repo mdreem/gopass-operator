@@ -18,9 +18,7 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	"google.golang.org/grpc"
-	"k8s.io/apimachinery/pkg/types"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -30,8 +28,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-const finalizerName = "gopass.repository.finalizer"
 
 var createRepositoryServiceClientFunc = createRepositoryServiceClient
 
@@ -72,6 +68,7 @@ func (r *GopassRepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	service, err := r.getService(ctx, log, req.NamespacedName)
 
+	// due to the creation/deletion-logic there are cases where the Service does not exist.
 	var repositoryServiceClient gopass_repository.RepositoryServiceClient
 	if service != nil {
 		var conn *grpc.ClientConn
@@ -83,7 +80,7 @@ func (r *GopassRepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		defer closeConnection(log, conn)
 	}
 
-	result, err, done := r.handleDeletion(ctx, req, log, gopassRepository, repositoryServiceClient)
+	result, err, done := r.handleDeletionOfResource(ctx, req, log, gopassRepository, repositoryServiceClient)
 	if done {
 		return result, err
 	}
@@ -95,12 +92,12 @@ func (r *GopassRepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	if !deploymentFinished {
-		log.Info("deployment not yet ready")
+		log.Info("deployment not yet ready, trying again later")
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
 
 	if service == nil {
-		log.Info("service did not exist yet")
+		log.Info("service did not exist yet, trying again later")
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
 
@@ -110,21 +107,7 @@ func (r *GopassRepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
-	interval, err := parseRefreshInterval(gopassRepository.Spec.RefreshInterval)
-	if err != nil {
-		log.Error(err, "unable to parse refresh interval")
-		return ctrl.Result{}, err
-	}
-
-	_, err = repositoryServiceClient.UpdateRepository(ctx, &gopass_repository.Repository{
-		RepositoryURL: gopassRepository.Spec.RepositoryURL,
-		Authentication: &gopass_repository.Authentication{
-			Namespace: req.NamespacedName.Namespace,
-			Username:  gopassRepository.Spec.UserName,
-			SecretRef: gopassRepository.Spec.SecretKeyRef.Name,
-			SecretKey: gopassRepository.Spec.SecretKeyRef.Key,
-		},
-	})
+	err = updateRepository(ctx, req, repositoryServiceClient, gopassRepository)
 	if err != nil {
 		log.Error(err, "unable to update repository")
 		return ctrl.Result{}, err
@@ -136,52 +119,13 @@ func (r *GopassRepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
+	interval, err := parseRefreshInterval(gopassRepository.Spec.RefreshInterval)
+	if err != nil {
+		log.Error(err, "unable to parse refresh interval")
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{RequeueAfter: interval}, nil
-}
-
-func (r *GopassRepositoryReconciler) handleDeletion(ctx context.Context, req ctrl.Request, log logr.Logger, repository *gopassv1alpha1.GopassRepository, serviceClient gopass_repository.RepositoryServiceClient) (ctrl.Result, error, bool) {
-	if repository.ObjectMeta.DeletionTimestamp.IsZero() {
-		log.Info("preparing to delete")
-		if !containsString(repository.ObjectMeta.Finalizers, finalizerName) {
-			repository.ObjectMeta.Finalizers = append(repository.ObjectMeta.Finalizers, finalizerName)
-			if err := r.Update(context.Background(), repository); err != nil {
-				return ctrl.Result{}, err, true
-			}
-		}
-	} else {
-		if containsString(repository.ObjectMeta.Finalizers, finalizerName) {
-			err := r.deleteExternalResources(ctx, log, req.NamespacedName, serviceClient)
-			if err != nil {
-				return ctrl.Result{}, err, true
-			}
-
-			repository.ObjectMeta.Finalizers = removeString(repository.ObjectMeta.Finalizers, finalizerName)
-			if err := r.Update(context.Background(), repository); err != nil {
-				return ctrl.Result{}, err, true
-			}
-		}
-		return ctrl.Result{}, nil, true
-	}
-	return ctrl.Result{}, nil, false
-}
-
-func containsString(slice []string, s string) bool {
-	for _, item := range slice {
-		if item == s {
-			return true
-		}
-	}
-	return false
-}
-
-func removeString(slice []string, s string) (result []string) {
-	for _, item := range slice {
-		if item == s {
-			continue
-		}
-		result = append(result, item)
-	}
-	return
 }
 
 func closeConnection(log logr.Logger, conn *grpc.ClientConn) {
@@ -202,118 +146,6 @@ func parseRefreshInterval(refreshInterval string) (time.Duration, error) {
 		return 0, err
 	}
 	return refreshIntervalValue, nil
-}
-
-func createRepositoryServiceClient(targetUrl string) (gopass_repository.RepositoryServiceClient, *grpc.ClientConn, error) {
-	var conn *grpc.ClientConn
-	conn, err := grpc.Dial(targetUrl+":9000", grpc.WithInsecure())
-	if err != nil {
-		return nil, nil, err
-	}
-	return gopass_repository.NewRepositoryServiceClient(conn), conn, nil
-}
-
-func updateAllPasswords(ctx context.Context, log logr.Logger, namespacedName types.NamespacedName, url string, repositoryServiceClient gopass_repository.RepositoryServiceClient) error {
-	_, err := repositoryServiceClient.UpdateAllPasswords(ctx,
-		&gopass_repository.Repository{
-			RepositoryURL: url,
-			SecretName: &gopass_repository.NamespacedName{
-				Namespace: namespacedName.Namespace,
-				Name:      namespacedName.Name,
-			},
-		})
-
-	if err != nil {
-		log.Error(err, "not able to fetch passwords")
-		return err
-	}
-	return nil
-}
-
-func initializeRepository(ctx context.Context, log logr.Logger, url string, repositoryServiceClient gopass_repository.RepositoryServiceClient,
-	namespace string, gopassRepositorySpec gopassv1alpha1.GopassRepositorySpec) error {
-	log.Info("attempting to call repository server")
-	repository, err := repositoryServiceClient.InitializeRepository(
-		ctx,
-		&gopass_repository.RepositoryInitialization{
-			Repository: &gopass_repository.Repository{
-				RepositoryURL: url,
-				Authentication: &gopass_repository.Authentication{
-					Namespace: namespace,
-					Username:  gopassRepositorySpec.UserName,
-					SecretRef: gopassRepositorySpec.SecretKeyRef.Name,
-					SecretKey: gopassRepositorySpec.SecretKeyRef.Key,
-				},
-			},
-			GpgKeyReference: &gopass_repository.GpgKeyReference{
-				GpgKeyRef:    gopassRepositorySpec.GpgKeyRef.Name,
-				GpgKeyRefKey: gopassRepositorySpec.GpgKeyRef.Key,
-			},
-		},
-	)
-
-	if err != nil {
-		log.Error(err, "invalid response")
-		return err
-	}
-
-	if repository != nil {
-		log.Info("repository call:", "successful", (*repository).Successful)
-	} else {
-		log.Info("empty response from repository server")
-	}
-
-	return nil
-}
-
-func (r *GopassRepositoryReconciler) deleteExternalResources(ctx context.Context, log logr.Logger, namespacedName types.NamespacedName, serviceClient gopass_repository.RepositoryServiceClient) error {
-	if serviceClient != nil {
-		secret, err := serviceClient.DeleteSecret(ctx, &gopass_repository.Repository{
-			SecretName: &gopass_repository.NamespacedName{
-				Namespace: namespacedName.Namespace,
-				Name:      namespacedName.Name,
-			},
-		})
-		if err != nil {
-			log.Error(err, "unable to delete secret")
-			return err
-		}
-		if !secret.Successful {
-			delError := fmt.Errorf("deletion of secret not successful")
-			log.Error(delError, "deleteExternalResourcesFailed")
-			return delError
-		}
-	}
-
-	deployment, err := r.getDeployment(ctx, log, namespacedName)
-	if err != nil {
-		log.Error(err, "unable to get deployment for deleteExternalResources")
-		return err
-	}
-
-	if deployment != nil {
-		err = r.deleteDeployment(ctx, deployment)
-		if err != nil {
-			log.Error(err, "unable to delete deployment")
-			return err
-		}
-	}
-
-	service, err := r.getService(ctx, log, namespacedName)
-	if err != nil {
-		log.Error(err, "unable to get deployment for deleteExternalResources")
-		return err
-	}
-
-	if service != nil {
-		err = r.deleteService(ctx, service)
-		if err != nil {
-			log.Error(err, "unable to delete service")
-			return err
-		}
-	}
-
-	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
