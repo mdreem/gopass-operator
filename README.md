@@ -1,3 +1,6 @@
+[![codecov](https://codecov.io/gh/mdreem/gopass-operator/branch/master/graph/badge.svg?token=5P2SQBD7OA)](https://codecov.io/gh/mdreem/gopass-operator)
+![Go](https://github.com/mdreem/gopass-operator/workflows/Go/badge.svg)
+
 # gopass-operator
 
 :warning: this is only an experiment for now :warning:
