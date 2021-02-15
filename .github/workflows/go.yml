@@ -44,12 +44,10 @@ jobs:
       - name: Test
         run: cd controller && make test
 
-      - name: Temporarily save coverage data
-        uses: actions/upload-artifact@v2
+      - uses: codecov/codecov-action@v1.2.1
         with:
-          name: controller-coverage
-          path: controller/cover.out
-          retention-days: 1
+          files: ./controller/cover.out
+          verbose: true
 
   build-server:
     name: Build-Server
@@ -81,30 +79,10 @@ jobs:
       - name: Test
         run: cd gopass-server && make test
 
-      - name: Temporarily save coverage data
-        uses: actions/upload-artifact@v2
+      - uses: codecov/codecov-action@v1.2.1
         with:
-          name: gopass-server-coverage
-          path: gopass-server/coverage.out
-          retention-days: 1
-
-  upload-coverage:
-    name: Upload coverage data
-    runs-on: ubuntu-latest
-    needs: [build-controller, build-server]
-
-    steps:
-      - name: Retrieve coverage data of gopass-server
-        uses: actions/download-artifact@v2
-        with:
-          name: gopass-server-coverage
-          path: gopass-server
-
-      - name: Retrieve coverage data of controller
-        uses: actions/download-artifact@v2
-        with:
-          name: controller-coverage
-          path: controller
+          files: ./gopass-server/coverage.out
+          verbose: true
 
       - uses: codecov/codecov-action@v1.2.1
         with:
