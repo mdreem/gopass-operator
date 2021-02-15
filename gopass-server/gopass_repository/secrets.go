@@ -147,7 +147,7 @@ func createSecretMap(secrets *gopass_repository.SecretList) map[string]string {
 }
 
 func rename(name string) string {
-	reg, _ := regexp.Compile("[^a-zA-Z0-9 ]+")
+	reg, _ := regexp.Compile("[^a-zA-Z0-9]+")
 	return reg.ReplaceAllString(name, "-")
 }
 
