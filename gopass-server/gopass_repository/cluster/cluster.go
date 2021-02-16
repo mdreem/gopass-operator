@@ -7,14 +7,12 @@ import (
 	"github.com/mdreem/gopass-operator/pkg/apiclient/gopass_repository"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"log"
 	"os"
 	"os/exec"
 	"syscall"
 )
 
-var getRestInClusterConfigFunc = rest.InClusterConfig
 var execCommandContext = exec.CommandContext
 
 type Secret struct {
@@ -31,20 +29,10 @@ type KubernetesClient struct {
 	clientset kubernetes.Interface
 }
 
-func New() (KubernetesClient, error) {
-	config, err := getRestInClusterConfigFunc()
-	if err != nil {
-		return KubernetesClient{}, err
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return KubernetesClient{}, err
-	}
-
+func New(kubernetesClient kubernetes.Interface) KubernetesClient {
 	return KubernetesClient{
-		clientset: clientset,
-	}, nil
+		clientset: kubernetesClient,
+	}
 }
 
 func (k *KubernetesClient) GetRepositoryCredentials(ctx context.Context, authentication *gopass_repository.Authentication) (Secret, error) {

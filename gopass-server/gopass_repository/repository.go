@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
+	"github.com/gopasspw/gopass/pkg/gopass"
 	"github.com/gopasspw/gopass/pkg/gopass/api"
 	"github.com/mdreem/gopass-operator/gopass-server/gopass_repository/cluster"
 	"github.com/mdreem/gopass-operator/pkg/apiclient/gopass_repository"
@@ -123,7 +124,7 @@ func cloneGopassRepo(repositoryUrl string, path string, username string, passwor
 	return repository, err
 }
 
-func createNewGopassClient(ctx context.Context, path string) (*api.Gopass, error) {
+func createNewGopassClient(ctx context.Context, path string) (gopass.Store, error) {
 	file, err := ioutil.TempFile("", "*config.yml")
 	if err != nil {
 		log.Printf("not able to create temporary configuration file %v\n", err)

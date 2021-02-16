@@ -38,7 +38,7 @@ func (r *RepositoryServer) updateAllPasswords(ctx context.Context, repository *g
 		})
 	}
 
-	err = updateSecretMap(ctx, types.NamespacedName{
+	err = r.updateSecretMap(ctx, types.NamespacedName{
 		Namespace: repository.SecretName.Namespace,
 		Name:      repository.SecretName.Name,
 	}, &secretList)
@@ -74,27 +74,17 @@ func fetchAllPasswords(ctx context.Context, repo *gopassRepo) ([]cluster.Secret,
 	return passwords, nil
 }
 
-func updateSecretMap(ctx context.Context, namespacedName types.NamespacedName, secrets *gopass_repository.SecretList) error {
+func (r *RepositoryServer) updateSecretMap(ctx context.Context, namespacedName types.NamespacedName, secrets *gopass_repository.SecretList) error {
 	log.Printf("updating secret map\n")
-
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		return err
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return err
-	}
 
 	newSecret := createSecret(secrets, namespacedName)
 
-	_, err = getSecretMap(ctx, clientset, namespacedName)
+	_, err := getSecretMap(ctx, r.KubernetesClient, namespacedName)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			log.Printf("creating secret map")
 
-			_, err := clientset.CoreV1().Secrets(namespacedName.Namespace).Create(ctx, &newSecret, metav1.CreateOptions{})
+			_, err := r.KubernetesClient.CoreV1().Secrets(namespacedName.Namespace).Create(ctx, &newSecret, metav1.CreateOptions{})
 			if err != nil {
 				log.Printf("unable to create secret map: %v\n", err)
 				return err
@@ -106,7 +96,7 @@ func updateSecretMap(ctx context.Context, namespacedName types.NamespacedName, s
 		}
 	}
 
-	_, err = clientset.CoreV1().Secrets(namespacedName.Namespace).Update(ctx, &newSecret, metav1.UpdateOptions{})
+	_, err = r.KubernetesClient.CoreV1().Secrets(namespacedName.Namespace).Update(ctx, &newSecret, metav1.UpdateOptions{})
 	if err != nil {
 		log.Printf("not able to update secret map: %v", err)
 		return err
@@ -115,7 +105,7 @@ func updateSecretMap(ctx context.Context, namespacedName types.NamespacedName, s
 	return nil
 }
 
-func getSecretMap(ctx context.Context, clientset *kubernetes.Clientset, namespacedName types.NamespacedName) (*corev1.Secret, error) {
+func getSecretMap(ctx context.Context, clientset kubernetes.Interface, namespacedName types.NamespacedName) (*corev1.Secret, error) {
 	secretMap, err := clientset.CoreV1().Secrets(namespacedName.Namespace).Get(ctx, namespacedName.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err

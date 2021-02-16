@@ -2,69 +2,15 @@ package cluster
 
 import (
 	"context"
-	"fmt"
 	"github.com/mdreem/gopass-operator/pkg/apiclient/gopass_repository"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/rest"
 	"os/exec"
 	"reflect"
 	"testing"
 )
-
-func TestNew(t *testing.T) {
-	tests := []struct {
-		name                 string
-		wantKubernetesClient bool
-		wantErr              bool
-	}{
-		{
-			name:                 "successful creation of KubernetesClient",
-			wantKubernetesClient: true,
-			wantErr:              false,
-		},
-		{
-			name:                 "unsuccessful creation of KubernetesClient",
-			wantKubernetesClient: false,
-			wantErr:              true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			originalGetRestInClusterConfigFunc := getRestInClusterConfigFunc
-			if tt.wantErr {
-				getRestInClusterConfigFunc = mockedFailingRestInClusterConfig
-			} else {
-				getRestInClusterConfigFunc = mockedGetRestInClusterConfig
-			}
-			defer func() {
-				getRestInClusterConfigFunc = originalGetRestInClusterConfigFunc
-			}()
-
-			kubernetesClient, err := New()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("New() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			kubernetesClientInitialized := kubernetesClient != KubernetesClient{}
-			if kubernetesClientInitialized != tt.wantKubernetesClient {
-				t.Errorf("New() kubernetesClient = %v, kubernetesClient: %v", kubernetesClient, tt.wantKubernetesClient)
-			}
-		})
-	}
-}
-
-func mockedGetRestInClusterConfig() (*rest.Config, error) {
-	return &rest.Config{
-		Host: "testHost",
-	}, nil
-}
-
-func mockedFailingRestInClusterConfig() (*rest.Config, error) {
-	return nil, fmt.Errorf("I failed")
-}
 
 func TestKubernetesClient_GetRepositoryCredentials(t *testing.T) {
 	type fields struct {
