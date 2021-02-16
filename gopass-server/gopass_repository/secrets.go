@@ -10,7 +10,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"log"
 	"regexp"
 )
@@ -141,26 +140,17 @@ func rename(name string) string {
 	return reg.ReplaceAllString(name, "-")
 }
 
-func deleteSecretMap(ctx context.Context, namespacedName types.NamespacedName) (bool, error) {
+func (r *RepositoryServer) deleteSecretMap(ctx context.Context, namespacedName types.NamespacedName) (bool, error) {
 	log.Printf("deleting secret")
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		return false, err
-	}
 
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return false, err
-	}
-
-	secret, err := getSecretMap(ctx, clientset, namespacedName)
+	secret, err := getSecretMap(ctx, r.KubernetesClient, namespacedName)
 
 	if secret == nil {
 		log.Printf("secret not found")
 		return true, nil
 	}
 
-	err = clientset.CoreV1().Secrets(namespacedName.Namespace).Delete(ctx, namespacedName.Name, metav1.DeleteOptions{})
+	err = r.KubernetesClient.CoreV1().Secrets(namespacedName.Namespace).Delete(ctx, namespacedName.Name, metav1.DeleteOptions{})
 	if err != nil {
 		log.Printf("unable to delete secret: %v", err)
 		return false, err

@@ -101,7 +101,7 @@ func (r *RepositoryServer) UpdateAllPasswords(ctx context.Context, repository *g
 }
 
 func (r *RepositoryServer) DeleteSecret(ctx context.Context, repository *gopass_repository.Repository) (*gopass_repository.RepositoryResponse, error) {
-	successful, err := deleteSecretMap(ctx, types.NamespacedName{
+	successful, err := r.deleteSecretMap(ctx, types.NamespacedName{
 		Namespace: repository.SecretName.Namespace,
 		Name:      repository.SecretName.Name,
 	})
