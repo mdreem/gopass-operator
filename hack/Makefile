@@ -14,7 +14,7 @@ restart-repository:
 restart-controller:
 	kubectl rollout restart deployment operator-controller-manager -n operator-system
 
-restart-all: restart-repository restart-controller
+restart-all: restart-controller
 
 build-restart: all restart-all
 

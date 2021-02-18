@@ -19,7 +19,7 @@ func (r *GopassRepositoryReconciler) createRepositoryServer(ctx context.Context,
 	appName := namespacedName.Name + "-" + uuid.New().String()
 
 	var deployment *appsv1.Deployment
-	deployment, err := r.getDeployment(ctx, log, namespacedName)
+	deployment, err := r.getDeployment(ctx, namespacedName)
 	if err != nil {
 		log.Error(err, "unable to fetch deployment")
 		return false, err
@@ -37,7 +37,7 @@ func (r *GopassRepositoryReconciler) createRepositoryServer(ctx context.Context,
 	}
 
 	var service *corev1.Service
-	service, err = r.getService(ctx, log, namespacedName)
+	service, err = r.getService(ctx, namespacedName)
 	if err != nil {
 		log.Error(err, "unable to fetch service")
 		return false, err
@@ -64,7 +64,7 @@ func (r *GopassRepositoryReconciler) createRepositoryServer(ctx context.Context,
 	return false, nil
 }
 
-func (r *GopassRepositoryReconciler) getDeployment(ctx context.Context, log logr.Logger, namespacedName types.NamespacedName) (*appsv1.Deployment, error) {
+func (r *GopassRepositoryReconciler) getDeployment(ctx context.Context, namespacedName types.NamespacedName) (*appsv1.Deployment, error) {
 	labelSelector := labels.Set{
 		"gopassRepoName":      namespacedName.Name,
 		"gopassRepoNamespace": namespacedName.Namespace,
@@ -76,7 +76,7 @@ func (r *GopassRepositoryReconciler) getDeployment(ctx context.Context, log logr
 		Namespace:     r.Namespace,
 	})
 	if err != nil {
-		log.Error(err, "unable to fetch list of deployments")
+		r.Log.Error(err, "unable to fetch list of deployments")
 		return nil, err
 	}
 
@@ -95,7 +95,7 @@ func getRelevantDeployment(deployments *[]appsv1.Deployment) (*appsv1.Deployment
 	return &(*deployments)[0], nil
 }
 
-func (r *GopassRepositoryReconciler) getService(ctx context.Context, log logr.Logger, namespacedName types.NamespacedName) (*corev1.Service, error) {
+func (r *GopassRepositoryReconciler) getService(ctx context.Context, namespacedName types.NamespacedName) (*corev1.Service, error) {
 	labelSelector := labels.Set{
 		"gopassRepoName":      namespacedName.Name,
 		"gopassRepoNamespace": namespacedName.Namespace,
@@ -107,7 +107,7 @@ func (r *GopassRepositoryReconciler) getService(ctx context.Context, log logr.Lo
 		Namespace:     r.Namespace,
 	})
 	if err != nil {
-		log.Error(err, "unable to fetch list of services")
+		r.Log.Error(err, "unable to fetch list of services")
 		return nil, err
 	}
 

@@ -66,7 +66,7 @@ func (r *GopassRepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	service, err := r.getService(ctx, log, req.NamespacedName)
+	service, err := r.getService(ctx, req.NamespacedName)
 
 	// due to the creation/deletion-logic there are cases where the Service does not exist.
 	var repositoryServiceClient gopass_repository.RepositoryServiceClient
@@ -80,7 +80,7 @@ func (r *GopassRepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		defer closeConnection(log, conn)
 	}
 
-	result, err, done := r.handleDeletionOfResource(ctx, req, log, gopassRepository, repositoryServiceClient)
+	result, err, done := r.handleDeletionOfResource(ctx, req, gopassRepository, repositoryServiceClient)
 	if done {
 		return result, err
 	}

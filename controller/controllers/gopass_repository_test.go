@@ -15,6 +15,7 @@ func InitializeTestRepositoryServer() *TestRepositoryServer {
 			"InitializeRepository": {},
 			"UpdateRepository":     {},
 			"UpdateAllPasswords":   {},
+			"DeleteSecret":         {},
 		},
 	}
 }
@@ -44,7 +45,7 @@ func (r *TestRepositoryServer) UpdateAllPasswords(_ context.Context, repository 
 }
 
 func (r *TestRepositoryServer) DeleteSecret(_ context.Context, repository *gopass_repository.Repository) (*gopass_repository.RepositoryResponse, error) {
-	r.Calls["UpdateAllPasswords"] = append(r.Calls["UpdateAllPasswords"], repository.RepositoryURL)
+	r.Calls["DeleteSecret"] = append(r.Calls["DeleteSecret"], repository.RepositoryURL)
 	return &gopass_repository.RepositoryResponse{
 		Successful:   true,
 		ErrorMessage: "",

@@ -3,7 +3,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"github.com/go-logr/logr"
 	gopassv1alpha1 "github.com/mdreem/gopass-operator/controller/api/v1alpha1"
 	"github.com/mdreem/gopass-operator/pkg/apiclient/gopass_repository"
 	"k8s.io/apimachinery/pkg/types"
@@ -12,24 +11,24 @@ import (
 
 const finalizerName = "gopass.repository.finalizer"
 
-func (r *GopassRepositoryReconciler) handleDeletionOfResource(ctx context.Context, req ctrl.Request, log logr.Logger, repository *gopassv1alpha1.GopassRepository, serviceClient gopass_repository.RepositoryServiceClient) (ctrl.Result, error, bool) {
+func (r *GopassRepositoryReconciler) handleDeletionOfResource(ctx context.Context, req ctrl.Request, repository *gopassv1alpha1.GopassRepository, serviceClient gopass_repository.RepositoryServiceClient) (ctrl.Result, error, bool) {
 	if repository.ObjectMeta.DeletionTimestamp.IsZero() {
-		log.Info("preparing to delete")
 		if !containsString(repository.ObjectMeta.Finalizers, finalizerName) {
+			r.Log.Info("add finalizer")
 			repository.ObjectMeta.Finalizers = append(repository.ObjectMeta.Finalizers, finalizerName)
-			if err := r.Update(context.Background(), repository); err != nil {
-				return ctrl.Result{}, err, true
+			if err := r.Update(ctx, repository); err != nil {
+				return ctrl.Result{}, err, false
 			}
 		}
 	} else {
 		if containsString(repository.ObjectMeta.Finalizers, finalizerName) {
-			err := r.deleteExternalResources(ctx, log, req.NamespacedName, serviceClient)
+			err := r.deleteExternalResources(ctx, req.NamespacedName, serviceClient)
 			if err != nil {
 				return ctrl.Result{}, err, true
 			}
 
 			repository.ObjectMeta.Finalizers = removeString(repository.ObjectMeta.Finalizers, finalizerName)
-			if err := r.Update(context.Background(), repository); err != nil {
+			if err := r.Update(ctx, repository); err != nil {
 				return ctrl.Result{}, err, true
 			}
 		}
@@ -38,7 +37,7 @@ func (r *GopassRepositoryReconciler) handleDeletionOfResource(ctx context.Contex
 	return ctrl.Result{}, nil, false
 }
 
-func (r *GopassRepositoryReconciler) deleteExternalResources(ctx context.Context, log logr.Logger, namespacedName types.NamespacedName, serviceClient gopass_repository.RepositoryServiceClient) error {
+func (r *GopassRepositoryReconciler) deleteExternalResources(ctx context.Context, namespacedName types.NamespacedName, serviceClient gopass_repository.RepositoryServiceClient) error {
 	if serviceClient != nil {
 		secret, err := serviceClient.DeleteSecret(ctx, &gopass_repository.Repository{
 			SecretName: &gopass_repository.NamespacedName{
@@ -47,40 +46,40 @@ func (r *GopassRepositoryReconciler) deleteExternalResources(ctx context.Context
 			},
 		})
 		if err != nil {
-			log.Error(err, "unable to delete secret")
+			r.Log.Error(err, "unable to delete secret")
 			return err
 		}
 		if !secret.Successful {
 			delError := fmt.Errorf("deletion of secret not successful")
-			log.Error(delError, "deleteExternalResourcesFailed")
+			r.Log.Error(delError, "deleteExternalResourcesFailed")
 			return delError
 		}
 	}
 
-	deployment, err := r.getDeployment(ctx, log, namespacedName)
+	deployment, err := r.getDeployment(ctx, namespacedName)
 	if err != nil {
-		log.Error(err, "unable to get deployment for deleteExternalResources")
+		r.Log.Error(err, "unable to get deployment for deleteExternalResources")
 		return err
 	}
 
 	if deployment != nil {
 		err = r.deleteDeployment(ctx, deployment)
 		if err != nil {
-			log.Error(err, "unable to delete deployment")
+			r.Log.Error(err, "unable to delete deployment")
 			return err
 		}
 	}
 
-	service, err := r.getService(ctx, log, namespacedName)
+	service, err := r.getService(ctx, namespacedName)
 	if err != nil {
-		log.Error(err, "unable to get deployment for deleteExternalResources")
+		r.Log.Error(err, "unable to get deployment for deleteExternalResources")
 		return err
 	}
 
 	if service != nil {
 		err = r.deleteService(ctx, service)
 		if err != nil {
-			log.Error(err, "unable to delete service")
+			r.Log.Error(err, "unable to delete service")
 			return err
 		}
 	}
