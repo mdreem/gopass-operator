@@ -128,6 +128,50 @@ func TestGopassRepositoryReconciler_handleDeletionOfResource(t *testing.T) {
 			wantedError:   nil,
 			wantedSuccess: false,
 		},
+		{
+			name: "Deletion scheduled. Finalizer exists. Deployment and Service do not exist.",
+			fields: fields{
+				Client: fake.NewClientBuilder().WithRuntimeObjects(
+					&gopassv1alpha1.GopassRepository{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "test-repository",
+							Namespace: "test-namespace",
+							DeletionTimestamp: &metav1.Time{
+								Time: time.Time{},
+							},
+						},
+					},
+				).Build(),
+				Log:       logr_testing.NullLogger{},
+				Namespace: "",
+			},
+			args: args{
+				ctx: context.Background(),
+				req: controllerruntime.Request{
+					NamespacedName: types.NamespacedName{
+						Namespace: "test-namespace",
+						Name:      "test-repository",
+					},
+				},
+				repository: &gopassv1alpha1.GopassRepository{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-repository",
+						Namespace: "test-namespace",
+						DeletionTimestamp: &metav1.Time{
+							Time: time.Unix(123, 456),
+						},
+						Finalizers: []string{"gopass.repository.finalizer"},
+					},
+				},
+				serviceClient: NewTestRepositoryServiceClient(),
+			},
+			wantedResult: controllerruntime.Result{
+				Requeue:      false,
+				RequeueAfter: 0,
+			},
+			wantedError:   nil,
+			wantedSuccess: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
