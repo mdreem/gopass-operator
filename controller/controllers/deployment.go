@@ -3,7 +3,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"github.com/go-logr/logr"
 	"github.com/google/uuid"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -15,23 +14,23 @@ import (
 
 var getRelevantDeploymentFunc = getRelevantDeployment
 
-func (r *GopassRepositoryReconciler) createRepositoryServer(ctx context.Context, log logr.Logger, namespacedName types.NamespacedName) (bool, error) {
+func (r *GopassRepositoryReconciler) createRepositoryServer(ctx context.Context, namespacedName types.NamespacedName) (bool, error) {
 	appName := namespacedName.Name + "-" + uuid.New().String()
 
 	var deployment *appsv1.Deployment
 	deployment, err := r.getDeployment(ctx, namespacedName)
 	if err != nil {
-		log.Error(err, "unable to fetch deployment")
+		r.Log.Error(err, "unable to fetch deployment")
 		return false, err
 	}
 
 	if deployment == nil {
-		log.Info("creating deployment")
+		r.Log.Info("creating deployment")
 
 		deployment = r.createDeployment(namespacedName, appName)
 		err := r.Client.Create(ctx, deployment)
 		if err != nil {
-			log.Error(err, "unable to create deployment")
+			r.Log.Error(err, "unable to create deployment")
 			return false, err
 		}
 	}
@@ -39,27 +38,27 @@ func (r *GopassRepositoryReconciler) createRepositoryServer(ctx context.Context,
 	var service *corev1.Service
 	service, err = r.getService(ctx, namespacedName)
 	if err != nil {
-		log.Error(err, "unable to fetch service")
+		r.Log.Error(err, "unable to fetch service")
 		return false, err
 	}
 
 	if service == nil {
-		log.Info("creating service")
+		r.Log.Info("creating service")
 		service = r.createService(namespacedName, appName)
 		err := r.Client.Create(ctx, service)
 		if err != nil {
-			log.Error(err, "unable to create service")
+			r.Log.Error(err, "unable to create service")
 			return false, err
 		}
 	}
 
 	availableReplicas := deployment.Status.AvailableReplicas
 	if availableReplicas > 0 {
-		log.Info("deployment of repository server finished")
+		r.Log.Info("deployment of repository server finished")
 		return true, nil
 	}
 
-	log.Info("deployment of repository server in progress")
+	r.Log.Info("deployment of repository server in progress")
 
 	return false, nil
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/mdreem/gopass-operator/pkg/apiclient/gopass_repository"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const finalizerName = "gopass.repository.finalizer"
@@ -16,7 +17,7 @@ func (r *GopassRepositoryReconciler) handleDeletionOfResource(ctx context.Contex
 		if !containsString(repository.ObjectMeta.Finalizers, finalizerName) {
 			r.Log.Info("add finalizer")
 			repository.ObjectMeta.Finalizers = append(repository.ObjectMeta.Finalizers, finalizerName)
-			if err := r.Update(ctx, repository); err != nil {
+			if err := r.Patch(ctx, repository, client.MergeFrom(repository)); err != nil {
 				return ctrl.Result{}, err, false
 			}
 		}
@@ -28,7 +29,7 @@ func (r *GopassRepositoryReconciler) handleDeletionOfResource(ctx context.Contex
 			}
 
 			repository.ObjectMeta.Finalizers = removeString(repository.ObjectMeta.Finalizers, finalizerName)
-			if err := r.Update(ctx, repository); err != nil {
+			if err := r.Patch(ctx, repository, client.MergeFrom(repository)); err != nil {
 				return ctrl.Result{}, err, true
 			}
 		}

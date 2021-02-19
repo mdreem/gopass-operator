@@ -85,7 +85,7 @@ func (r *GopassRepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return result, err
 	}
 
-	deploymentFinished, err := r.createRepositoryServer(ctx, log, req.NamespacedName)
+	deploymentFinished, err := r.createRepositoryServer(ctx, req.NamespacedName)
 	if err != nil {
 		log.Error(err, "not able to deploy repository server")
 		return ctrl.Result{}, err
