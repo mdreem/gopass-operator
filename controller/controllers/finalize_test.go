@@ -7,6 +7,8 @@ import (
 	gopassv1alpha1 "github.com/mdreem/gopass-operator/controller/api/v1alpha1"
 	"github.com/mdreem/gopass-operator/pkg/apiclient/gopass_repository"
 	"google.golang.org/grpc"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -33,28 +35,28 @@ func NewTestRepositoryServiceClient() *TestRepositoryServiceClient {
 	}
 }
 
-func (r *TestRepositoryServiceClient) InitializeRepository(ctx context.Context, in *gopass_repository.RepositoryInitialization, opts ...grpc.CallOption) (*gopass_repository.RepositoryResponse, error) {
+func (r *TestRepositoryServiceClient) InitializeRepository(_ context.Context, _ *gopass_repository.RepositoryInitialization, _ ...grpc.CallOption) (*gopass_repository.RepositoryResponse, error) {
 	return &gopass_repository.RepositoryResponse{
 		Successful:   true,
 		ErrorMessage: "",
 	}, nil
 }
 
-func (r *TestRepositoryServiceClient) UpdateRepository(ctx context.Context, in *gopass_repository.Repository, opts ...grpc.CallOption) (*gopass_repository.RepositoryResponse, error) {
+func (r *TestRepositoryServiceClient) UpdateRepository(_ context.Context, _ *gopass_repository.Repository, _ ...grpc.CallOption) (*gopass_repository.RepositoryResponse, error) {
 	return &gopass_repository.RepositoryResponse{
 		Successful:   true,
 		ErrorMessage: "",
 	}, nil
 }
 
-func (r *TestRepositoryServiceClient) UpdateAllPasswords(ctx context.Context, in *gopass_repository.Repository, opts ...grpc.CallOption) (*gopass_repository.RepositoryResponse, error) {
+func (r *TestRepositoryServiceClient) UpdateAllPasswords(_ context.Context, _ *gopass_repository.Repository, _ ...grpc.CallOption) (*gopass_repository.RepositoryResponse, error) {
 	return &gopass_repository.RepositoryResponse{
 		Successful:   true,
 		ErrorMessage: "",
 	}, nil
 }
 
-func (r *TestRepositoryServiceClient) DeleteSecret(ctx context.Context, in *gopass_repository.Repository, opts ...grpc.CallOption) (*gopass_repository.RepositoryResponse, error) {
+func (r *TestRepositoryServiceClient) DeleteSecret(_ context.Context, _ *gopass_repository.Repository, _ ...grpc.CallOption) (*gopass_repository.RepositoryResponse, error) {
 	return &gopass_repository.RepositoryResponse{
 		Successful:   true,
 		ErrorMessage: "",
@@ -62,10 +64,14 @@ func (r *TestRepositoryServiceClient) DeleteSecret(ctx context.Context, in *gopa
 }
 
 func init() {
-	gopassv1alpha1.AddToScheme(scheme.Scheme)
+	err := gopassv1alpha1.AddToScheme(scheme.Scheme)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func TestGopassRepositoryReconciler_handleDeletionOfResource(t *testing.T) {
+
 	type fields struct {
 		Client    client.Client
 		Log       logr.Logger
@@ -77,13 +83,20 @@ func TestGopassRepositoryReconciler_handleDeletionOfResource(t *testing.T) {
 		repository    *gopassv1alpha1.GopassRepository
 		serviceClient gopass_repository.RepositoryServiceClient
 	}
+
+	const repositoryName = "test-repository"
+	const testNameSpace = "test-namespace"
+	const finalizerName = "gopass.repository.finalizer"
+
 	tests := []struct {
-		name          string
-		fields        fields
-		args          args
-		wantedResult  controllerruntime.Result
-		wantedError   error
-		wantedSuccess bool
+		name              string
+		fields            fields
+		args              args
+		wantedResult      controllerruntime.Result
+		wantedError       error
+		wantedSuccess     bool
+		wantedServices    int
+		wantedDeployments int
 	}{
 		{
 			name: "No deletion scheduled. Add finalizer.",
@@ -91,8 +104,8 @@ func TestGopassRepositoryReconciler_handleDeletionOfResource(t *testing.T) {
 				Client: fake.NewClientBuilder().WithRuntimeObjects(
 					&gopassv1alpha1.GopassRepository{
 						ObjectMeta: metav1.ObjectMeta{
-							Name:      "test-repository",
-							Namespace: "test-namespace",
+							Name:      repositoryName,
+							Namespace: testNameSpace,
 							DeletionTimestamp: &metav1.Time{
 								Time: time.Time{},
 							},
@@ -106,14 +119,14 @@ func TestGopassRepositoryReconciler_handleDeletionOfResource(t *testing.T) {
 				ctx: context.Background(),
 				req: controllerruntime.Request{
 					NamespacedName: types.NamespacedName{
-						Namespace: "test-namespace",
-						Name:      "test-repository",
+						Namespace: testNameSpace,
+						Name:      repositoryName,
 					},
 				},
 				repository: &gopassv1alpha1.GopassRepository{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-repository",
-						Namespace: "test-namespace",
+						Name:      repositoryName,
+						Namespace: testNameSpace,
 						DeletionTimestamp: &metav1.Time{
 							Time: time.Time{},
 						},
@@ -125,8 +138,10 @@ func TestGopassRepositoryReconciler_handleDeletionOfResource(t *testing.T) {
 				Requeue:      false,
 				RequeueAfter: 0,
 			},
-			wantedError:   nil,
-			wantedSuccess: false,
+			wantedError:       nil,
+			wantedSuccess:     false,
+			wantedServices:    0,
+			wantedDeployments: 0,
 		},
 		{
 			name: "Deletion scheduled. Finalizer exists. Deployment and Service do not exist.",
@@ -134,8 +149,8 @@ func TestGopassRepositoryReconciler_handleDeletionOfResource(t *testing.T) {
 				Client: fake.NewClientBuilder().WithRuntimeObjects(
 					&gopassv1alpha1.GopassRepository{
 						ObjectMeta: metav1.ObjectMeta{
-							Name:      "test-repository",
-							Namespace: "test-namespace",
+							Name:      repositoryName,
+							Namespace: testNameSpace,
 							DeletionTimestamp: &metav1.Time{
 								Time: time.Time{},
 							},
@@ -149,18 +164,18 @@ func TestGopassRepositoryReconciler_handleDeletionOfResource(t *testing.T) {
 				ctx: context.Background(),
 				req: controllerruntime.Request{
 					NamespacedName: types.NamespacedName{
-						Namespace: "test-namespace",
-						Name:      "test-repository",
+						Namespace: testNameSpace,
+						Name:      repositoryName,
 					},
 				},
 				repository: &gopassv1alpha1.GopassRepository{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-repository",
-						Namespace: "test-namespace",
+						Name:      repositoryName,
+						Namespace: testNameSpace,
 						DeletionTimestamp: &metav1.Time{
 							Time: time.Unix(123, 456),
 						},
-						Finalizers: []string{"gopass.repository.finalizer"},
+						Finalizers: []string{finalizerName},
 					},
 				},
 				serviceClient: NewTestRepositoryServiceClient(),
@@ -169,8 +184,76 @@ func TestGopassRepositoryReconciler_handleDeletionOfResource(t *testing.T) {
 				Requeue:      false,
 				RequeueAfter: 0,
 			},
-			wantedError:   nil,
-			wantedSuccess: true,
+			wantedError:       nil,
+			wantedSuccess:     true,
+			wantedServices:    0,
+			wantedDeployments: 0,
+		},
+		{
+			name: "Deletion scheduled. Finalizer exists. Deployment and Service do exist.",
+			fields: fields{
+				Client: fake.NewClientBuilder().WithRuntimeObjects(
+					&gopassv1alpha1.GopassRepository{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      repositoryName,
+							Namespace: testNameSpace,
+							DeletionTimestamp: &metav1.Time{
+								Time: time.Time{},
+							},
+						},
+					},
+					&appsv1.Deployment{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "test-deployment",
+							Namespace: testNameSpace,
+							Labels: map[string]string{
+								"gopassRepoName":      repositoryName,
+								"gopassRepoNamespace": testNameSpace,
+							},
+						},
+					},
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "test-deployment",
+							Namespace: testNameSpace,
+							Labels: map[string]string{
+								"gopassRepoName":      repositoryName,
+								"gopassRepoNamespace": testNameSpace,
+							},
+						},
+					},
+				).Build(),
+				Log:       logr_testing.NullLogger{},
+				Namespace: "",
+			},
+			args: args{
+				ctx: context.Background(),
+				req: controllerruntime.Request{
+					NamespacedName: types.NamespacedName{
+						Namespace: testNameSpace,
+						Name:      repositoryName,
+					},
+				},
+				repository: &gopassv1alpha1.GopassRepository{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      repositoryName,
+						Namespace: testNameSpace,
+						DeletionTimestamp: &metav1.Time{
+							Time: time.Unix(123, 456),
+						},
+						Finalizers: []string{finalizerName},
+					},
+				},
+				serviceClient: NewTestRepositoryServiceClient(),
+			},
+			wantedResult: controllerruntime.Result{
+				Requeue:      false,
+				RequeueAfter: 0,
+			},
+			wantedError:       nil,
+			wantedSuccess:     true,
+			wantedServices:    0,
+			wantedDeployments: 0,
 		},
 	}
 	for _, tt := range tests {
@@ -191,6 +274,24 @@ func TestGopassRepositoryReconciler_handleDeletionOfResource(t *testing.T) {
 			}
 			if deletionSuccessful != tt.wantedSuccess {
 				t.Errorf("handleDeletionOfResource() deletionSuccessful = %v, wantedResult %v", deletionSuccessful, tt.wantedSuccess)
+			}
+
+			var services = &corev1.ServiceList{}
+			err := tt.fields.Client.List(context.Background(), services)
+			if err != nil {
+				t.Errorf("unable to fetch list of services: %v", err)
+			}
+			if len(services.Items) != tt.wantedServices {
+				t.Errorf("number of remaining services was '%d', wanted '%v'", len(services.Items), tt.wantedServices)
+			}
+
+			var deployments = &appsv1.DeploymentList{}
+			err = tt.fields.Client.List(context.Background(), deployments)
+			if err != nil {
+				t.Errorf("unable to fetch list of deployments: %v", err)
+			}
+			if len(deployments.Items) != tt.wantedDeployments {
+				t.Errorf("number of remaining deployments was '%d', wanted '%v'", len(deployments.Items), tt.wantedDeployments)
 			}
 		})
 	}
