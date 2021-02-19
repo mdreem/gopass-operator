@@ -79,10 +79,18 @@ func TestInitializeRepository(t *testing.T) {
 		},
 	}
 
-	err := r.initializeRepository(context.Background(), &repositoryInitialization)
+	response, err := r.InitializeRepository(context.Background(), &repositoryInitialization)
 	if err != nil {
 		t.Errorf("not able to initialize repository: %v\n", err)
 		return
+	}
+
+	if !response.Successful {
+		t.Error("response not successful")
+	}
+
+	if response.ErrorMessage != "" {
+		t.Errorf("received error message '%s', expected empty error message", response.ErrorMessage)
 	}
 
 	deleteDirectory(t, repoDir)
@@ -122,32 +130,27 @@ func TestCloneAndUpdateRepository(t *testing.T) {
 	repository, err := cloneGopassRepo(localRepoDir, targetDir, "", "")
 	if err != nil {
 		t.Errorf("unable to clone repository: %v\n", err)
-		return
 	}
 
 	filename := filepath.Join(localRepoDir, "hello-world-file")
 	err = ioutil.WriteFile(filename, []byte("hello world!"), 0644)
 	if err != nil {
 		t.Errorf("unable to write to file: %v", err)
-		return
 	}
 
 	localRepo, err := git.PlainOpen(localRepoDir)
 	if err != nil {
 		t.Errorf("unable to open repository: %v", err)
-		return
 	}
 
 	worktree, err := localRepo.Worktree()
 	if err != nil {
 		t.Errorf("unable to get worktree: %v", err)
-		return
 	}
 
 	_, err = worktree.Add("hello-world-file")
 	if err != nil {
 		t.Errorf("unable to add file: %v", err)
-		return
 	}
 
 	_, err = worktree.Commit("some commit", &git.CommitOptions{
@@ -162,7 +165,6 @@ func TestCloneAndUpdateRepository(t *testing.T) {
 	err = r.updateRepository(context.Background(), &repo)
 	if err != nil {
 		t.Errorf("unable to update repository: %v\n", err)
-		return
 	}
 
 }
@@ -180,14 +182,20 @@ func TestUpdateGopassRepository(t *testing.T) {
 	})
 	if err != nil {
 		t.Errorf("unable to create remote: %v\n", err)
-		return
 	}
 
 	r, repo := createRepositoryServer(init)
-	err = r.updateRepository(context.Background(), &repo)
+	response, err := r.UpdateRepository(context.Background(), &repo)
 	if err != nil {
 		t.Errorf("unable to update repository: %v\n", err)
-		return
+	}
+
+	if !response.Successful {
+		t.Error("response not successful")
+	}
+
+	if response.ErrorMessage != "" {
+		t.Errorf("received error message '%s', expected empty error message", response.ErrorMessage)
 	}
 
 	files, err := ioutil.ReadDir(localRepoDir)
@@ -259,7 +267,6 @@ func deleteDirectory(t *testing.T, directory string) {
 		err := os.RemoveAll(directory)
 		if err != nil {
 			t.Errorf("not able to remove directory (%s): %v\n", directory, err)
-			return
 		}
 	}
 }
@@ -276,7 +283,6 @@ func unzip(src string, dest string, t *testing.T) {
 	r, err := zip.OpenReader(src)
 	if err != nil {
 		t.Errorf("not able to open repository: %v", err)
-		return
 	}
 	defer r.Close()
 
@@ -285,7 +291,6 @@ func unzip(src string, dest string, t *testing.T) {
 		rc, err := f.Open()
 		if err != nil {
 			t.Errorf("not able to open file (%s): %v", f.Name, err)
-			return
 		}
 		defer rc.Close()
 
@@ -294,20 +299,17 @@ func unzip(src string, dest string, t *testing.T) {
 			err = os.MkdirAll(path, f.Mode())
 			if err != nil {
 				t.Errorf("not able to create directory (%s): %v", path, err)
-				return
 			}
 		} else {
 			f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
 			if err != nil {
 				t.Errorf("not able to open file for writing (%s): %v", path, err)
-				return
 			}
 			defer f.Close()
 
 			_, err = io.Copy(f, rc)
 			if err != nil {
 				t.Errorf("unable to write to file (%s): %v", path, err)
-				return
 			}
 		}
 	}

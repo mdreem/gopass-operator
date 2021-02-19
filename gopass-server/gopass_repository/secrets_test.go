@@ -130,8 +130,18 @@ func TestRepositoryServer_updateAllPasswords(t *testing.T) {
 				Client:           tt.fields.Client,
 				KubernetesClient: tt.fields.KubernetesClient,
 			}
-			if err := r.updateAllPasswords(tt.args.ctx, tt.args.repository); (err != nil) != tt.wantErr {
+
+			response, err := r.UpdateAllPasswords(tt.args.ctx, tt.args.repository)
+			if (err != nil) != tt.wantErr {
 				t.Errorf("updateAllPasswords() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if err != nil && !response.Successful {
+				t.Error("response not successful")
+			}
+
+			if err != nil && response.ErrorMessage != "" {
+				t.Errorf("received error message '%s', expected empty error message", response.ErrorMessage)
 			}
 
 			actions := tt.fields.KubernetesClient.Actions()
@@ -218,13 +228,14 @@ func TestRepositoryServer_deleteSecretMap(t *testing.T) {
 				Client:           tt.fields.Client,
 				KubernetesClient: tt.fields.KubernetesClient,
 			}
-			got, err := r.deleteSecretMap(tt.args.ctx, tt.args.namespacedName)
+
+			successful, err := r.deleteSecretMap(tt.args.ctx, tt.args.namespacedName)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("deleteSecretMap() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if got != tt.want {
-				t.Errorf("deleteSecretMap() got = %v, want %v", got, tt.want)
+			if successful != tt.want {
+				t.Errorf("deleteSecretMap() got = %v, want %v", successful, tt.want)
 			}
 
 			actions := tt.fields.KubernetesClient.Actions()
